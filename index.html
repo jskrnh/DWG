@@ -1,5 +1,4 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="description" content="DraftBench — browser-based 2D CAD: open DWG/DXF, draft, save DXF, plot PDF."><title>DraftBench</title>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DraftBench</title></head><body><title>DraftBench</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap">
@@ -35,7 +34,7 @@ body { background: var(--bg); color: var(--fg); font: 14px/1.35 var(--font-ui); 
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.app { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; gap: 0; }
+.app { height: 100%; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto auto; gap: 0; }
 
 /* title bar */
 .top { display: flex; align-items: center; gap: 12px; padding-block: 8px; min-width: 0; }
@@ -155,7 +154,39 @@ textarea { resize: vertical; width: 100%; font-family: var(--font-mono); font-si
 }
 @media (prefers-reduced-motion: reduce) { .side { transition: none; } }
 @media (hover: none) { #cv { cursor: default; } }
-</style></head><body>
+
+.tabbar { display: flex; align-items: flex-end; gap: 2px; overflow-x: auto; background: var(--bg); border-bottom: 1px solid var(--line); padding: 4px 8px 0; scrollbar-width: thin; }
+.dtab { display: flex; align-items: center; gap: 6px; max-width: 220px; min-width: 90px; padding: 5px 4px 5px 10px; border: 1px solid var(--line); border-bottom: 0; border-radius: 6px 6px 0 0; background: var(--panel); color: var(--muted); cursor: pointer; flex: none; margin-bottom: -1px; }
+.dtab[aria-selected="true"] { color: var(--fg); background: var(--bg); border-bottom: 1px solid var(--bg); box-shadow: inset 0 2px 0 var(--accent); }
+.dtab .tn { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.dtab .dot { color: var(--warn); font-size: 10px; }
+.dtab .x, .newtab { border: 0; background: none; color: var(--muted); border-radius: 4px; width: 22px; height: 22px; line-height: 1; font-size: 16px; padding: 0; }
+.dtab .x:hover, .newtab:hover { background: var(--accent-soft); color: var(--fg); }
+.newtab { margin: 0 0 4px 4px; flex: none; }
+.lmdlg { width: min(860px, 100%); display: flex; flex-direction: column; max-height: min(640px, 100%); }
+.lmbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; align-items: center; }
+.lmbar .btn { padding: 4px 10px; font-size: 12.5px; }
+.lmbar input[type=search] { margin-left: auto; min-width: 140px; padding: 4px 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
+.lmwrap { overflow: auto; border: 1px solid var(--line); border-radius: 6px; flex: 1; min-height: 120px; }
+.lmtab { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lmtab th { position: sticky; top: 0; background: var(--panel); text-align: left; font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.lmtab td { padding: 3px 8px; border-bottom: 1px solid var(--line); }
+.lmtab tr.sel td { background: var(--accent-soft); }
+.lmtab tr.off .c-name input { color: var(--muted); }
+.lmtab .c-n { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lmtab input.lm-name, .lmtab select { width: 100%; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 3px 4px; }
+.lmtab input.lm-name:focus, .lmtab input.lm-name:hover, .lmtab select:hover { border-color: var(--line); }
+.lm-tog, .lm-cur, .lm-col { border: 1px solid var(--line); background: var(--bg); border-radius: 4px; padding: 2px 8px; font-size: 12px; }
+.lm-col { display: inline-flex; gap: 6px; align-items: center; }
+.lm-tog[aria-pressed="false"].lm-on { color: var(--muted); }
+.lm-tog[aria-pressed="true"].lm-lock { color: var(--warn); border-color: var(--warn); }
+.lm-cur { border: 0; background: none; font-size: 14px; }
+.lmfoot { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; }
+#lm-confirm { margin-top: 8px; padding: 8px; border: 1px solid var(--warn); border-radius: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.palette { position: fixed; z-index: 30; display: grid; grid-template-columns: repeat(17, 17px); gap: 1px; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.35); max-width: calc(100vw - 16px); }
+.palette button { width: 17px; height: 17px; border: 1px solid transparent; padding: 0; border-radius: 2px; }
+.palette button.on, .palette button:hover { border-color: var(--fg); }
+</style>
 
 <div class="app">
   <header class="top">
@@ -168,6 +199,7 @@ textarea { resize: vertical; width: 100%; font-family: var(--font-mono); font-si
       <button class="btn primary" id="btn-open" type="button">Open DWG / DXF</button>
       <button class="btn" id="btn-save" type="button" title="Ctrl+S">Save DXF</button>
       <button class="btn opt" id="btn-svg" type="button">Export SVG</button>
+      <button class="btn" id="btn-lm" type="button" title="Layer Manager (LA)">Layers</button>
       <button class="btn" id="btn-plot" type="button">Plot PDF</button>
       <button class="btn icon" id="btn-undo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
       <button class="btn icon opt" id="btn-redo" type="button" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
@@ -175,6 +207,7 @@ textarea { resize: vertical; width: 100%; font-family: var(--font-mono); font-si
     <input type="file" id="file" accept=".dwg,.dxf" hidden>
   </header>
 
+  <div class="tabbar" id="tabbar" role="tablist" aria-label="Open drawings"></div>
   <nav class="ribbon" aria-label="Commands">
     <section class="grp"><div class="tools">
       <button class="tool" data-cmd="LINE" type="button"><svg viewBox="0 0 18 18"><path d="M3 15 15 3"/><circle cx="3" cy="15" r="1.2"/><circle cx="15" cy="3" r="1.2"/></svg>Line<kbd>L</kbd></button>
@@ -243,7 +276,7 @@ textarea { resize: vertical; width: 100%; font-family: var(--font-mono); font-si
       </div>
       <div class="pane" id="pane-layers" hidden>
         <ul id="layers"></ul>
-        <div class="layer-actions"><button class="btn" id="layer-new" type="button">New layer</button><button class="btn" id="layer-del" type="button">Purge empty</button></div>
+        <div class="layer-actions"><button class="btn" id="layer-lm" type="button" onclick="document.getElementById('btn-lm').click()">Layer Manager…</button><button class="btn" id="layer-new" type="button">New layer</button><button class="btn" id="layer-del" type="button">Purge empty</button></div>
         <p class="hint" style="margin-top:12px">● sets the current layer. Off hides a layer; Lock keeps it visible but unselectable. Type an ACI number (1–255) to recolor; rename by editing the name.</p>
       </div>
     </aside>
@@ -292,6 +325,29 @@ textarea { resize: vertical; width: 100%; font-family: var(--font-mono); font-si
     <div class="row"><button class="btn" id="tx-close" type="button">Close</button><button class="btn primary" id="tx-copy" type="button">Copy all</button></div>
   </div>
 </div>
+<div class="modal" id="lm" hidden>
+  <div class="dlg lmdlg" role="dialog" aria-modal="true" aria-labelledby="lm-title">
+    <h3 id="lm-title">Layer Manager</h3>
+    <p class="sub">Click a row to select it (Ctrl or Shift for several). Toggles apply to every selected row.</p>
+    <div class="lmbar">
+      <button class="btn" data-lm="new" type="button">New</button>
+      <button class="btn" data-lm="del" type="button">Delete</button>
+      <button class="btn" data-lm="cur" type="button">Set current</button>
+      <button class="btn" data-lm="iso" type="button">Isolate</button>
+      <button class="btn" data-lm="showall" type="button">Show all</button>
+      <button class="btn" data-lm="unlock" type="button">Unlock all</button>
+      <button class="btn" data-lm="select" type="button">Select objects</button>
+      <button class="btn" data-lm="purge" type="button">Purge empty</button>
+      <button class="btn" data-lm="move" id="lm-move" type="button">Move selected objects here</button>
+      <input type="search" id="lm-filter" placeholder="Filter layers" aria-label="Filter layers">
+    </div>
+    <div class="lmwrap"><table class="lmtab"><thead><tr><th>Cur</th><th>Name</th><th>Visible</th><th>Lock</th><th>Color</th><th>Linetype</th><th>Objects</th></tr></thead><tbody id="lm-body"></tbody></table></div>
+    <div id="lm-confirm" hidden></div>
+    <p class="lmfoot" id="lm-foot"></p>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn primary" id="lm-close" type="button">Done</button></div>
+  </div>
+</div>
+<div class="palette" id="palette" hidden></div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -779,7 +835,8 @@ function dwgToDoc(db) {
   const doc = newDoc(); doc.layers.clear(); const warnings = new Set();
   for (const L of (db.tables.LAYER && db.tables.LAYER.entries) || []) {
     const col = L.colorIndex == null || L.colorIndex === 256 ? 7 : L.colorIndex;
-    doc.layers.set(L.name, { name: L.name, color: Math.abs(col) || 7, on: !L.off && !L.frozen && col >= 0, locked: !!L.locked, lt: (L.lineType || 'CONTINUOUS').toUpperCase() });
+    const fl = L.standardFlag | 0, ci = Math.abs(col);
+    doc.layers.set(L.name, { name: L.name, color: ci >= 1 && ci <= 255 ? ci : 7, on: col >= 0 && !(fl & 1), locked: !!(fl & 4), lt: (L.lineType || 'CONTINUOUS').toUpperCase() });
   }
   if (!doc.layers.has('0')) doc.layers.set('0', { name: '0', color: 7, on: true, locked: false, lt: 'CONTINUOUS' });
   const p2 = o => P(o ? o.x || 0 : 0, o ? o.y || 0 : 0);
@@ -1661,7 +1718,7 @@ def(['ZOOM', 'Z'], async () => {
 }, 'Zoom to extents or a window');
 def(['ZE'], async () => { zoomExtents(); return false; }, 'Zoom extents');
 def(['PAN', 'P'], async () => { setPan(!panMode); return false; }, 'Toggle pan mode');
-def(['LAYER', 'LA'], async () => { showTab('layers'); return false; }, 'Open the layer panel');
+def(['LAYER', 'LA', 'LM'], async () => { openLM(); return false; }, 'Open the Layer Manager');
 def(['UNDO', 'U'], async () => { undo(); return false; }, 'Undo');
 def(['REDO'], async () => { redo(); return false; }, 'Redo');
 def(['SNAPUNIT', 'SN'], async () => { st.snapUnit = (await getNum(`Snap spacing <${st.snapUnit}>`, { def: st.snapUnit })).num; st.snap = true; syncToggles(); return false; }, 'Set grid snap spacing');
@@ -1725,6 +1782,7 @@ cv.addEventListener('pointerup', ev => {
   if (req && req.type === 'pick') { const e = entAt(sx, sy, req.filter || selectable); if (e) resolveReq({ ent: e, pt: s2w(sx, sy) }); return; }
   if (!req && !running && sel.size) { for (const e of doc.ents) if (sel.has(e.id)) for (const g of grips(e)) { const s = w2s(g.p); if (Math.abs(s.x - sx) < 6 && Math.abs(s.y - sy) < 6) { gripEdit(e, g); return; } } }
   const e = entAt(sx, sy, selectable);
+  if (!e && !req) { const h = entAt(sx, sy, null); if (h) { const L = doc.layers.get(h.layer); if (L && L.locked) toast(`That object is on locked layer "${h.layer}". Unlock it in the Layer Manager (Layers button).`); } }
   if (e) { if (di.shift && sel.has(e.id)) sel.delete(e.id); else sel.add(e.id); }
   else if (!req && !di.shift) sel.clear();
   updateProps(); draw();
@@ -1752,6 +1810,7 @@ let spaceDown = false;
 window.addEventListener('keydown', ev => {
   const tag = (document.activeElement && document.activeElement.tagName) || '';
   const inField = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') && document.activeElement !== inEl;
+  if (typeof LM !== 'undefined' && LM.open) { if (ev.key === 'Escape') { if (palOpen()) closePalette(); else closeLM(); } return; }
   if (ev.key === 'F3') { ev.preventDefault(); toggle('osnap'); return; }
   if (ev.key === 'F7') { ev.preventDefault(); toggle('grid'); return; }
   if (ev.key === 'F8') { ev.preventDefault(); toggle('ortho'); return; }
@@ -1760,6 +1819,7 @@ window.addEventListener('keydown', ev => {
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); if (!running) ev.shiftKey ? redo() : undo(); return; }
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'y') { ev.preventDefault(); if (!running) redo(); return; }
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); saveDXF(); return; }
+  if ((ev.ctrlKey || ev.metaKey) && (ev.key.toLowerCase() === 'c' || ev.key.toLowerCase() === 'v') && !running && (document.activeElement === document.body || document.activeElement === cv || (document.activeElement === inEl && !inEl.value))) { ev.preventDefault(); if (ev.key.toLowerCase() === 'c') { if (sel.size) runCommand('COPYCLIP'); } else runCommand('PASTECLIP'); return; }
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'o') { ev.preventDefault(); $('#file').click(); return; }
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'a') { if (document.activeElement === inEl && inEl.value) return; ev.preventDefault(); doc.ents.filter(selectable).forEach(e => sel.add(e.id)); updateProps(); draw(); return; }
   if (document.activeElement === inEl) return;
@@ -1902,21 +1962,19 @@ $('#pp').addEventListener('change', ev => {
 });
 
 // ---------- file IO ----------
-function updateTitle() { $('#docname').textContent = doc.name + (dirty ? ' •' : ''); $('#example-flag').hidden = !docIsExample; }
-function loadDoc(d, name) {
-  doc = d; doc.name = name || doc.name; sel.clear(); undoStack = []; redoStack = []; dirty = false; docIsExample = false;
-  refreshLayers(); updateProps(); updateTitle(); zoomExtents(); updateStatus();
-  log(`Opened ${doc.name}: ${doc.ents.length} objects, ${doc.layers.size} layers, ${[...doc.blocks.keys()].filter(n => !n.startsWith('*')).length} blocks.`, 'out');
-  if (d.warnings && d.warnings.length) log(`Not shown (unsupported object types): ${d.warnings.join(', ')}`, 'dim');
-}
-function newDrawing() { if (dirty && !confirmBar('Discard unsaved changes and start a new drawing?', newDrawing)) return; const d = newDoc(); d.name = 'Untitled.dxf'; loadDoc(d, 'Untitled.dxf'); view.s = 4; view.tx = view.w / 2; view.ty = view.h / 2; draw(); }
+function updateTitle() { $('#docname').textContent = doc.name + (dirty ? ' •' : ''); $('#example-flag').hidden = !docIsExample; if (typeof renderTabs === 'function') renderTabs(); }
 let confirmPending = null;
 function confirmBar(msg, fn) { if (confirmPending === fn) { confirmPending = null; dirty = false; return true; } confirmPending = fn; toast(msg + ' Click again to confirm.'); setTimeout(() => { if (confirmPending === fn) confirmPending = null; }, 5000); return false; }
-$('#file').addEventListener('change', ev => { const f = ev.target.files[0]; if (f) openFile(f); ev.target.value = ''; });
+$('#file').addEventListener('change', async ev => { const fs = [...ev.target.files]; ev.target.value = ''; for (const f of fs) await openFile(f); });
 const stage = $('#stage');
 stage.addEventListener('dragover', ev => { ev.preventDefault(); stage.classList.add('drop'); });
 stage.addEventListener('dragleave', () => stage.classList.remove('drop'));
-stage.addEventListener('drop', ev => { ev.preventDefault(); stage.classList.remove('drop'); const f = ev.dataTransfer.files[0]; if (f) openFile(f); });
+stage.addEventListener('drop', ev => { ev.preventDefault(); stage.classList.remove('drop'); (async () => { for (const f of [...ev.dataTransfer.files]) await openFile(f); })(); });
+function announce() {
+  log(`Opened ${doc.name}: ${doc.ents.length} objects, ${doc.layers.size} layers, ${[...doc.blocks.keys()].filter(n => !n.startsWith('*')).length} blocks.`, 'out');
+  if (doc.warnings && doc.warnings.length) log(`Not shown (unsupported object types): ${doc.warnings.join(', ')}`, 'dim');
+  const lk = [...doc.layers.values()].filter(L => L.locked).length; if (lk) toast(`${lk} layer${lk > 1 ? 's are' : ' is'} locked in this file. Open the Layer Manager to unlock.`);
+}
 async function openFile(f) {
   const ext = f.name.split('.').pop().toLowerCase();
   busy(`Reading ${f.name}…`);
@@ -1925,15 +1983,15 @@ async function openFile(f) {
       const buf = await f.arrayBuffer(); let text = new TextDecoder('utf-8').decode(buf);
       if (/^AutoCAD Binary DXF/.test(text.slice(0, 22))) throw new Error('Binary DXF is not supported. Save it as ASCII DXF.');
       if (text.includes('\uFFFD')) text = new TextDecoder('windows-1252').decode(buf);
-      loadDoc(parseDXF(text), f.name);
+      await openDocTab(parseDXF(text), f.name); announce();
     } else if (ext === 'dwg') {
       const lib = await loadDwgLib();
       const buf = await f.arrayBuffer();
       const raw = lib.L.dwg_read_data(buf, lib.m.Dwg_File_Type.DWG);
       if (!raw) throw new Error('This DWG could not be read.');
       const db = lib.L.convert(raw); try { lib.L.dwg_free(raw); } catch (e) { }
-      const d = dwgToDoc(db); loadDoc(d, f.name);
-      log('DWG opened read-only from the original; saving writes a DXF copy.', 'dim');
+      await openDocTab(dwgToDoc(db), f.name); announce();
+      log('DWG opened; saving writes a DXF copy (the original DWG is not modified).', 'dim');
     } else throw new Error('Open a .dwg or .dxf file.');
   } catch (err) { console.error(err); log(`Could not open ${f.name}: ${err.message || err}`, 'err'); toast(`Could not open ${f.name}.`); }
   busy(null);
@@ -2091,13 +2149,227 @@ function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = fal
 function busy(msg) { const b = $('#busy'); if (msg) { b.textContent = msg; b.hidden = false; } else b.hidden = true; }
 $('#btn-open').addEventListener('click', () => $('#file').click());
 $('#btn-save').addEventListener('click', saveDXF);
-$('#btn-new').addEventListener('click', newDrawing);
+$('#btn-new').addEventListener('click', () => newDrawing());
+$('#btn-lm').addEventListener('click', openLM);
 $('#btn-undo').addEventListener('click', () => !running && undo());
 $('#btn-redo').addEventListener('click', () => !running && redo());
 $('#btn-ze').addEventListener('click', zoomExtents);
 $('#btn-pan').addEventListener('click', () => setPan(!panMode));
 window.addEventListener('beforeunload', ev => { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
 new ResizeObserver(resize).observe($('#stage'));
+// ---------- document tabs ----------
+let tabs = [], curTab = null, tabSeq = 1, closeArmed = null, tabKey = '';
+const makeTab = (d, example) => ({ id: tabSeq++, doc: d, undo: [], redo: [], dirty: false, example: !!example, vw: null });
+function saveTab() { if (!curTab) return; curTab.doc = doc; curTab.undo = undoStack; curTab.redo = redoStack; curTab.dirty = dirty; curTab.example = docIsExample; curTab.vw = { s: view.s, tx: view.tx, ty: view.ty }; }
+async function settle() { if (running || req) { cancel(); await new Promise(r => setTimeout(r, 0)); } }
+function showTabDoc(t) {
+  curTab = t; doc = t.doc; undoStack = t.undo; redoStack = t.redo; dirty = t.dirty; docIsExample = t.example; sel = new Set(); hover = null; snapHit = null;
+  if (t.vw) { view.s = t.vw.s; view.tx = t.vw.tx; view.ty = t.vw.ty; } else zoomExtents();
+  refreshLayers(); updateProps(); updateTitle(); updateStatus(); draw();
+}
+async function activateTab(t) { if (!t || t === curTab) return; await settle(); saveTab(); showTabDoc(t); }
+async function openDocTab(d, name, example) {
+  await settle(); saveTab();
+  if (name) d.name = name;
+  const t = makeTab(d, example), prev = curTab; tabs.push(t);
+  if (prev && prev.example && !prev.dirty) tabs.splice(tabs.indexOf(prev), 1);
+  showTabDoc(t); return t;
+}
+async function closeTab(t) {
+  await settle(); saveTab();
+  if (t.dirty && closeArmed !== t.id) { closeArmed = t.id; toast(`"${t.doc.name}" has unsaved changes. Click × again to close it anyway.`); setTimeout(() => { if (closeArmed === t.id) closeArmed = null; }, 5000); return; }
+  closeArmed = null;
+  const i = tabs.indexOf(t); if (i < 0) return; tabs.splice(i, 1);
+  if (!tabs.length) { curTab = null; newDrawing(); return; }
+  if (t === curTab) { curTab = null; showTabDoc(tabs[Math.min(i, tabs.length - 1)]); } else renderTabs();
+}
+function renderTabs() {
+  const bar = $('#tabbar'); if (!bar) return;
+  const key = tabs.map(t => `${t.id}:${t.doc.name}:${t === curTab ? dirty : t.dirty}`).join('|') + '#' + (curTab ? curTab.id : '');
+  if (key === tabKey) return; tabKey = key;
+  bar.innerHTML = tabs.map(t => { const on = t === curTab, dt = on ? dirty : t.dirty; return `<div class="dtab" role="tab" tabindex="${on ? 0 : -1}" aria-selected="${on}" data-tab-id="${t.id}" title="${esc(t.doc.name)}"><span class="tn">${esc(t.doc.name)}</span>${dt ? '<span class="dot" title="Unsaved changes">●</span>' : ''}<button class="x" type="button" aria-label="Close ${esc(t.doc.name)}" title="Close">×</button></div>`; }).join('') + '<button class="newtab" id="tab-new" type="button" title="New blank drawing" aria-label="New drawing">+</button>';
+  const a = bar.querySelector('[aria-selected="true"]');
+  if (a) { const l = a.offsetLeft, r = l + a.offsetWidth; if (l < bar.scrollLeft) bar.scrollLeft = l - 8; else if (r > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = r - bar.clientWidth + 40; }
+}
+$('#tabbar').addEventListener('click', ev => {
+  if (ev.target.closest('#tab-new')) return newDrawing();
+  const el = ev.target.closest('.dtab'); if (!el) return; const t = tabs.find(x => x.id === +el.dataset.tabId); if (!t) return;
+  if (ev.target.closest('.x')) closeTab(t); else activateTab(t);
+});
+$('#tabbar').addEventListener('auxclick', ev => { if (ev.button !== 1) return; const el = ev.target.closest('.dtab'); const t = el && tabs.find(x => x.id === +el.dataset.tabId); if (t) { ev.preventDefault(); closeTab(t); } });
+$('#tabbar').addEventListener('keydown', ev => {
+  const i = tabs.indexOf(curTab); if (i < 0) return;
+  if (ev.key === 'ArrowRight' || ev.key === 'ArrowLeft') { ev.preventDefault(); const n = tabs[(i + (ev.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length]; activateTab(n).then(() => { const e = $('#tabbar').querySelector('[aria-selected="true"]'); if (e) e.focus(); }); }
+  else if (ev.key === 'Delete' || (ev.key === 'w' && (ev.ctrlKey || ev.metaKey))) { ev.preventDefault(); closeTab(curTab); }
+});
+function newDrawing() {
+  let n = 1; const used = new Set(tabs.map(t => t.doc.name)); while (used.has(`Untitled-${n}.dxf`)) n++;
+  openDocTab(newDoc(), `Untitled-${n}.dxf`);
+}
+
+// ---------- copy and paste between tabs ----------
+let clip = null;
+const plain = o => JSON.parse(JSON.stringify(o, (k, v) => k.startsWith('_') ? undefined : v));
+def(['COPYCLIP', 'CC'], async () => {
+  const ents = await getSel(); const bb = docBB(doc, ents), base = P(bb[0], bb[1]);
+  const names = new Set(), walkB = e => { if (e.type === 'INSERT' && !names.has(e.name)) { names.add(e.name); const b = doc.blocks.get(e.name); if (b) b.ents.forEach(walkB); } }; ents.forEach(walkB);
+  const layers = new Set(ents.map(e => e.layer)); names.forEach(n => { const b = doc.blocks.get(n); if (b) b.ents.forEach(e => layers.add(e.layer)); });
+  clip = { ents: ents.map(cloneEnt), base, blocks: [...names].map(n => doc.blocks.get(n)).filter(Boolean).map(plain), layers: [...layers].map(n => doc.layers.get(n)).filter(Boolean).map(plain) };
+  log(`${ents.length} object${ents.length > 1 ? 's' : ''} copied. Paste with Ctrl+V, in this tab or another one.`, 'out'); sel.clear(); return false;
+}, 'Copy objects to paste in any tab');
+def(['PASTECLIP', 'PC'], async () => {
+  if (!clip) throw new Error('Nothing copied yet. Select objects and press Ctrl+C first.');
+  const mv = c => mTrans(c.x - clip.base.x, c.y - clip.base.y);
+  const r = await getPoint('Specify insertion point', { preview: c => clip.ents.map(e => xform(cloneEnt(e), mv(c))) }); const q = needPoint(r);
+  const rename = new Map();
+  for (const b of clip.blocks) {
+    const ex = doc.blocks.get(b.name); const nb = plain(b);
+    if (!ex) { doc.blocks.set(b.name, nb); continue; }
+    if (JSON.stringify(plain(ex).ents.map(e => ({ ...e, id: 0 }))) === JSON.stringify(nb.ents.map(e => ({ ...e, id: 0 })))) continue;
+    let n = 2; while (doc.blocks.has(`${b.name}_${n}`)) n++; const nn = `${b.name}_${n}`; rename.set(b.name, nn); nb.name = nn; doc.blocks.set(nn, nb);
+  }
+  for (const L of clip.layers) if (!doc.layers.has(L.name)) doc.layers.set(L.name, plain(L));
+  const added = clip.ents.map(e => { const c = xform(cloneEnt(e), mv(q)); if (c.type === 'INSERT' && rename.has(c.name)) c.name = rename.get(c.name); return c; });
+  added.forEach(e => doc.ents.push(e)); sel.clear(); added.forEach(e => sel.add(e.id));
+  log(`${added.length} object${added.length > 1 ? 's' : ''} pasted${rename.size ? ` (block${rename.size > 1 ? 's' : ''} renamed to avoid a clash: ${[...rename.values()].join(', ')})` : ''}.`, 'out');
+}, 'Paste copied objects');
+
+// ---------- layer manager ----------
+const LM = { open: false, sel: new Set(), anchor: null, filter: '', confirm: null };
+function layerCounts() { const c = {}; doc.ents.forEach(e => c[e.layer] = (c[e.layer] || 0) + 1); return c; }
+function blockCounts() { const c = {}; doc.blocks.forEach(b => b.ents.forEach(e => c[e.layer] = (c[e.layer] || 0) + 1)); return c; }
+const sortedLayers = () => [...doc.layers.values()].sort((a, b) => a.name === '0' ? -1 : b.name === '0' ? 1 : a.name.localeCompare(b.name, undefined, { numeric: true }));
+function openLM() { LM.open = true; $('#lm').hidden = false; LM.confirm = null; LM.filter = ''; $('#lm-filter').value = ''; if (![...LM.sel].some(n => doc.layers.has(n))) LM.sel = new Set([doc.clayer]); renderLM(); }
+function closeLM() { LM.open = false; LM.confirm = null; $('#lm').hidden = true; closePalette(); }
+function lmTargets(name) { return LM.sel.has(name) ? [...LM.sel].filter(n => doc.layers.has(n)) : [name]; }
+function renameLayer(old, nn) {
+  const L = doc.layers.get(old); nn = nn.trim(); if (!L || !nn || nn === old) return false;
+  if (doc.layers.has(nn)) { toast(`A layer named "${nn}" already exists.`); return false; }
+  pushUndo(); doc.layers.delete(old); L.name = nn; doc.layers.set(nn, L);
+  const ren = e => { if (e.layer === old) e.layer = nn; }; doc.ents.forEach(ren); doc.blocks.forEach(b => b.ents.forEach(ren)); if (doc.clayer === old) doc.clayer = nn;
+  if (LM.sel.delete(old)) LM.sel.add(nn); return true;
+}
+function dropSel() { doc.ents.forEach(e => { if (sel.has(e.id) && !selectable(e)) sel.delete(e.id); }); }
+function renderLM() {
+  if (!LM.open) return;
+  const counts = layerCounts(), q = LM.filter.trim().toLowerCase();
+  [...LM.sel].forEach(n => { if (!doc.layers.has(n)) LM.sel.delete(n); });
+  const rows = sortedLayers().filter(L => !q || L.name.toLowerCase().includes(q));
+  const ltOpts = cur => { const l = [...LTS]; if (cur && !l.includes(ltPattern(cur) || cur)) l.push(cur); return l; };
+  $('#lm-body').innerHTML = rows.map(L => { const lt = ltPattern(L.lt) || (L.lt || 'CONTINUOUS'); return `<tr data-layer="${esc(L.name)}" class="${LM.sel.has(L.name) ? 'sel' : ''}${L.name === doc.clayer ? ' cur' : ''}${!L.on ? ' off' : ''}">
+    <td class="c-cur"><button class="lm-cur" type="button" title="${L.name === doc.clayer ? 'Current layer' : 'Make current'}" aria-label="Make ${esc(L.name)} current">${L.name === doc.clayer ? '●' : '○'}</button></td>
+    <td class="c-name"><input class="lm-name" value="${esc(L.name)}" ${L.name === '0' ? 'readonly' : ''} aria-label="Layer name"></td>
+    <td><button class="lm-tog lm-on" type="button" aria-pressed="${L.on}" title="Show or hide">${L.on ? 'On' : 'Off'}</button></td>
+    <td><button class="lm-tog lm-lock" type="button" aria-pressed="${L.locked}" title="Lock or unlock">${L.locked ? 'Locked' : 'Open'}</button></td>
+    <td><button class="lm-col" type="button" title="Change color">${swatch(L.color, L.rgb)}<span>${L.color}</span></button></td>
+    <td><select class="lm-lt" aria-label="Linetype for ${esc(L.name)}">${ltOpts(L.lt).map(o => `<option ${o === lt ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></td>
+    <td class="c-n">${counts[L.name] || 0}</td></tr>`; }).join('') || '<tr><td colspan="7" class="empty">No layers match that filter.</td></tr>';
+  const selN = [...LM.sel].length, lockedN = [...doc.layers.values()].filter(L => L.locked).length, offN = [...doc.layers.values()].filter(L => !L.on).length;
+  $('#lm-foot').textContent = `${rows.length} of ${doc.layers.size} layers · ${selN} selected · ${lockedN} locked · ${offN} off · current: ${doc.clayer}`;
+  const mvb = $('#lm-move'); const n = doc.ents.filter(e => sel.has(e.id)).length; mvb.textContent = n ? `Move ${n} selected object${n > 1 ? 's' : ''} here` : 'Move selected objects here'; mvb.disabled = !n;
+  const cf = $('#lm-confirm');
+  if (LM.confirm) {
+    const c = LM.confirm, others = [...doc.layers.keys()].filter(n => !c.names.includes(n));
+    cf.hidden = false;
+    cf.innerHTML = `<span>Delete ${c.names.length} layer${c.names.length > 1 ? 's' : ''} (${esc(c.names.slice(0, 3).join(', '))}${c.names.length > 3 ? '…' : ''})? ${c.count} object${c.count === 1 ? '' : 's'} on ${c.names.length > 1 ? 'them' : 'it'} will move to</span> <select id="lm-target" aria-label="Move objects to layer">${others.map(n => `<option ${n === c.target ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select> <button class="btn primary" id="lm-do-del" type="button">Delete</button> <button class="btn" id="lm-no-del" type="button">Cancel</button>`;
+  } else cf.hidden = true;
+}
+function applyToLayers(names, fn) { pushUndo(); names.forEach(n => { const L = doc.layers.get(n); if (L) fn(L); }); dropSel(); refreshLayers(); updateProps(); draw(); }
+$('#lm-body').addEventListener('click', ev => {
+  const tr = ev.target.closest('tr[data-layer]'); if (!tr) return; const name = tr.dataset.layer, L = doc.layers.get(name); if (!L) return;
+  if (ev.target.closest('.lm-cur')) { doc.clayer = name; refreshLayers(); return; }
+  if (ev.target.closest('.lm-on')) { const v = !L.on; applyToLayers(lmTargets(name), x => x.on = v); return; }
+  if (ev.target.closest('.lm-lock')) { const v = !L.locked; applyToLayers(lmTargets(name), x => x.locked = v); return; }
+  if (ev.target.closest('.lm-col')) { openPalette(ev.target.closest('.lm-col'), lmTargets(name)); return; }
+  if (ev.target.closest('select') || ev.target.closest('input')) return;
+  const order = sortedLayers().filter(x => !LM.filter.trim() || x.name.toLowerCase().includes(LM.filter.trim().toLowerCase())).map(x => x.name);
+  if (ev.shiftKey && LM.anchor && order.includes(LM.anchor)) { const a = order.indexOf(LM.anchor), b = order.indexOf(name); LM.sel = new Set(order.slice(Math.min(a, b), Math.max(a, b) + 1)); }
+  else if (ev.ctrlKey || ev.metaKey) { LM.sel.has(name) ? LM.sel.delete(name) : LM.sel.add(name); LM.anchor = name; }
+  else { LM.sel = new Set([name]); LM.anchor = name; }
+  renderLM();
+});
+$('#lm-body').addEventListener('focusin', ev => { if (ev.target.classList.contains('lm-name')) { const n = ev.target.closest('tr').dataset.layer; if (!LM.sel.has(n)) { LM.sel = new Set([n]); LM.anchor = n; ev.target.closest('tbody').querySelectorAll('tr').forEach(r => r.classList.toggle('sel', r.dataset.layer === n)); } } });
+$('#lm-body').addEventListener('change', ev => {
+  const tr = ev.target.closest('tr[data-layer]'); if (!tr) return; const name = tr.dataset.layer;
+  if (ev.target.classList.contains('lm-name')) { if (!renameLayer(name, ev.target.value)) ev.target.value = name; refreshLayers(); updateProps(); draw(); }
+  else if (ev.target.classList.contains('lm-lt')) { const v = ev.target.value; applyToLayers(lmTargets(name), x => x.lt = v); }
+});
+$('#lm-body').addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.classList.contains('lm-name')) ev.target.blur(); });
+$('#lm-filter').addEventListener('input', ev => { LM.filter = ev.target.value; renderLM(); });
+$('#lm-close').addEventListener('click', closeLM);
+$('#lm').addEventListener('pointerdown', ev => { if (ev.target === $('#lm')) closeLM(); });
+$('#lm-confirm').addEventListener('click', ev => {
+  if (ev.target.id === 'lm-no-del') { LM.confirm = null; renderLM(); }
+  if (ev.target.id === 'lm-do-del') { const c = LM.confirm, target = $('#lm-target').value; pushUndo(); const mv = e => { if (c.names.includes(e.layer)) { e.layer = target; invalidate(e); } }; doc.ents.forEach(mv); doc.blocks.forEach(b => b.ents.forEach(mv)); c.names.forEach(n => doc.layers.delete(n)); if (!doc.layers.has(doc.clayer)) doc.clayer = target; c.names.forEach(n => LM.sel.delete(n)); LM.confirm = null; toast(`${c.names.length} layer${c.names.length > 1 ? 's' : ''} deleted.`); refreshLayers(); updateProps(); draw(); }
+});
+$('#lm-confirm').addEventListener('change', ev => { if (ev.target.id === 'lm-target' && LM.confirm) LM.confirm.target = ev.target.value; });
+function selNames() { return [...LM.sel].filter(n => doc.layers.has(n)); }
+document.querySelectorAll('[data-lm]').forEach(b => b.addEventListener('click', () => {
+  const act = b.dataset.lm, names = selNames();
+  if (act === 'new') {
+    let i = 1; while (doc.layers.has('Layer' + i)) i++; const src = doc.layers.get(names[0] || doc.clayer) || {}; const nn = 'Layer' + i;
+    pushUndo(); doc.layers.set(nn, { name: nn, color: src.color || 7, on: true, locked: false, lt: src.lt || 'CONTINUOUS' }); LM.sel = new Set([nn]); LM.anchor = nn; LM.filter = ''; $('#lm-filter').value = ''; refreshLayers();
+    const inp = $('#lm-body').querySelector(`tr[data-layer="${CSS.escape(nn)}"] .lm-name`); if (inp) { inp.scrollIntoView({ block: 'nearest' }); inp.focus(); inp.select(); } return;
+  }
+  if (act === 'del') {
+    const del = names.filter(n => n !== '0' && n !== doc.clayer);
+    if (!del.length) return toast(names.length ? 'Layer 0 and the current layer cannot be deleted. Make another layer current first.' : 'Click a layer first (Ctrl or Shift to pick several).');
+    const cnt = layerCounts(), bc = blockCounts(); const count = del.reduce((s, n) => s + (cnt[n] || 0) + (bc[n] || 0), 0);
+    if (!count) { pushUndo(); del.forEach(n => { doc.layers.delete(n); LM.sel.delete(n); }); toast(`${del.length} empty layer${del.length > 1 ? 's' : ''} deleted.`); refreshLayers(); return; }
+    LM.confirm = { names: del, count, target: doc.layers.has('0') && !del.includes('0') ? '0' : [...doc.layers.keys()].find(n => !del.includes(n)) }; renderLM(); return;
+  }
+  if (act === 'cur') { if (names.length !== 1) return toast('Click one layer to make it current.'); doc.clayer = names[0]; refreshLayers(); return; }
+  if (act === 'iso') { if (!names.length) return toast('Click the layer or layers to keep visible.'); pushUndo(); doc.layers.forEach(L => L.on = names.includes(L.name)); dropSel(); refreshLayers(); updateProps(); draw(); return; }
+  if (act === 'showall') { pushUndo(); doc.layers.forEach(L => L.on = true); refreshLayers(); draw(); return; }
+  if (act === 'unlock') { pushUndo(); doc.layers.forEach(L => L.locked = false); refreshLayers(); draw(); return; }
+  if (act === 'purge') { purgeEmpty(); return; }
+  if (act === 'select') {
+    if (!names.length) return toast('Click a layer first.');
+    const hit = doc.ents.filter(e => names.includes(e.layer)), ok = hit.filter(e => selectable(e));
+    if (!hit.length) return toast('No objects on that layer.');
+    if (!ok.length) return toast('Those layers are hidden or locked. Turn them on and unlock them first.');
+    sel = new Set(ok.map(e => e.id)); closeLM(); updateProps(); draw();
+    toast(`${ok.length} object${ok.length > 1 ? 's' : ''} selected${ok.length < hit.length ? ` (${hit.length - ok.length} skipped on hidden or locked layers)` : ''}.`); return;
+  }
+  if (act === 'move') {
+    if (names.length !== 1) return toast('Click the one layer to move the objects to.');
+    const ents = doc.ents.filter(e => sel.has(e.id)); if (!ents.length) return;
+    pushUndo(); ents.forEach(e => { e.layer = names[0]; invalidate(e); }); dropSel(); toast(`${ents.length} object${ents.length > 1 ? 's' : ''} moved to ${names[0]}.`); refreshLayers(); updateProps(); draw();
+  }
+}));
+function purgeEmpty() {
+  const used = new Set(doc.ents.map(e => e.layer)); doc.blocks.forEach(b => b.ents.forEach(e => used.add(e.layer)));
+  const unused = [...doc.layers.keys()].filter(n => n !== '0' && n !== doc.clayer && !used.has(n));
+  if (!unused.length) { toast('Every layer is in use (or current). Only empty layers can be purged.'); return; }
+  pushUndo(); unused.forEach(n => { doc.layers.delete(n); LM.sel.delete(n); }); toast(`Purged ${unused.length} empty layer${unused.length > 1 ? 's' : ''}.`); refreshLayers();
+}
+// color palette
+const pal = $('#palette');
+const palOpen = () => !pal.hidden;
+function closePalette() { pal.hidden = true; pal._names = null; }
+function openPalette(btn, names) {
+  const cur = (doc.layers.get(names[0]) || {}).color;
+  pal.innerHTML = Array.from({ length: 255 }, (_, i) => { const c = i + 1; return `<button type="button" data-aci="${c}" title="ACI ${c}" aria-label="Color ${c}" style="background:${cssACI(c)}" class="${c === cur ? 'on' : ''}"></button>`; }).join('');
+  pal._names = names; pal.hidden = false;
+  const r = btn.getBoundingClientRect(), w = pal.offsetWidth || 320, h = pal.offsetHeight || 290;
+  let x = Math.min(r.left, innerWidth - w - 8), y = r.bottom + 4; if (y + h > innerHeight - 8) y = Math.max(8, r.top - h - 4);
+  pal.style.left = Math.max(8, x) + 'px'; pal.style.top = y + 'px';
+}
+pal.addEventListener('click', ev => { const b = ev.target.closest('[data-aci]'); if (!b || !pal._names) return; const c = +b.dataset.aci, names = pal._names; closePalette(); applyToLayers(names, L => { L.color = c; delete L.rgb; }); });
+document.addEventListener('pointerdown', ev => { if (palOpen() && !ev.target.closest('#palette') && !ev.target.closest('.lm-col')) closePalette(); });
+
+// layer commands that pick an object
+const pickLayer = async (prompt) => { const pk = await getPick(prompt, { filter: e => layerVisible(e.layer) }); return doc.layers.get(pk.ent.layer); };
+def(['LAYISO'], async () => { const L = await pickLayer('Select an object on the layer to isolate'); doc.layers.forEach(x => x.on = x === L); dropSel(); log(`Layer "${L.name}" isolated. LAYON shows every layer again.`, 'out'); }, 'Hide every layer except the picked one');
+def(['LAYON', 'LAYUNISO'], async () => { doc.layers.forEach(x => x.on = true); log('All layers are on.', 'out'); }, 'Turn all layers on');
+def(['LAYOFF'], async () => { const L = await pickLayer('Select an object on the layer to turn off'); L.on = false; dropSel(); log(`Layer "${L.name}" is off.`, 'out'); }, 'Turn off the picked layer');
+def(['LAYLCK'], async () => { const L = await pickLayer('Select an object on the layer to lock'); L.locked = true; dropSel(); log(`Layer "${L.name}" is locked.`, 'out'); }, 'Lock the picked layer');
+def(['LAYULK'], async () => { const L = await pickLayer('Select an object on the layer to unlock'); L.locked = false; log(`Layer "${L.name}" is unlocked.`, 'out'); }, 'Unlock the picked layer');
+def(['UNLOCKALL'], async () => { let n = 0; doc.layers.forEach(x => { if (x.locked) { x.locked = false; n++; } }); log(n ? `${n} layer${n > 1 ? 's' : ''} unlocked.` : 'No layers were locked.', 'out'); }, 'Unlock every layer');
+def(['LAYMCUR'], async () => { const L = await pickLayer('Select an object to make its layer current'); doc.clayer = L.name; log(`Current layer is "${L.name}".`, 'out'); }, 'Make the picked object’s layer current');
+
+// initial tab
+curTab = makeTab(doc, true); curTab.vw = null; tabs.push(curTab);
 setPrompt('Command'); syncToggles(); refreshLayers(); updateProps(); updateTitle();
 resize(); zoomExtents();
 log('DraftBench ready. Type a command (L, C, PL, TR, …) or HELP. Open a DWG or DXF with Open or drag it onto the canvas.', 'dim');
