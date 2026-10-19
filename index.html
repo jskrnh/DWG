@@ -1690,9 +1690,7 @@ def(['AREA', 'AA'], async () => {
   const l = pts.map(p => ({ ...p, b: 0 })); let per = 0; for (let i = 0; i < pts.length; i++) per += dist(pts[i], pts[(i + 1) % pts.length]);
   log(`Area = ${fmtNum(loopArea(l), 4)},  Perimeter = ${fmtNum(per, 4)}`, 'out'); return false;
 }, 'Measure area and perimeter');
-def(['LIST', 'LI'], async () => {
-  const ents = await getSel();
-  for (const e of ents.slice(0, 20)) {
+function describeEnt(e) {
     let s = `${e.type} on layer "${e.layer}"`;
     if (e.type === 'LINE') s += `  from ${fp(e.a)} to ${fp(e.b)}  length ${fmtNum(dist(e.a, e.b), 4)}`;
     if (e.type === 'CIRCLE') s += `  center ${fp(e.c)}  radius ${fmtNum(e.r, 4)}`;
@@ -1700,8 +1698,11 @@ def(['LIST', 'LI'], async () => {
     if (e.type === 'PLINE') s += `  ${e.v.length} vertices${e.closed ? ', closed, area ' + fmtNum(loopArea(e.v), 4) : ''}`;
     if (e.type === 'INSERT') s += `  block "${e.name}" at ${fp(e.p)}`;
     if (e.type === 'TEXT' || e.type === 'MTEXT') s += `  "${textLines(e).join(' ')}"  height ${fmtNum(e.h, 3)}`;
-    log(s, 'out');
-  }
+    return s;
+}
+def(['LIST', 'LI'], async () => {
+  const ents = await getSel();
+  for (const e of ents.slice(0, 20)) log(describeEnt(e), 'out');
   if (ents.length > 20) log(`…and ${ents.length - 20} more`, 'dim'); return false;
 }, 'List object data');
 const fp = p => `${fmtNum(p.x, 4)},${fmtNum(p.y, 4)}`;
@@ -1911,6 +1912,7 @@ function updateProps() {
   const same = k => ents.every(e => (e[k] ?? null) === (ents[0][k] ?? null)) ? ents[0][k] : undefined;
   const types = [...new Set(ents.map(e => e.type))];
   let h = `<div class="pp-type">${types.length === 1 ? (ents.length > 1 ? ents.length + ' × ' : '') + types[0] : ents.length + ' objects (' + types.join(', ').toLowerCase() + ')'}</div>`;
+  h += `<button class="btn" id="pp-copy" type="button" style="margin-bottom:8px;padding:3px 9px;font-size:12.5px">Copy details to clipboard</button>`;
   const lay = same('layer');
   h += `<label class="fld"><span>Layer</span><select id="pp-layer">${lay === undefined ? '<option value="">*varies*</option>' : ''}${[...doc.layers.keys()].map(n => `<option ${n === lay ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>`;
   const col = same('color');
@@ -1930,7 +1932,7 @@ function updateProps() {
     if (e.type === 'HATCH') h += field('pp-pat', 'Pattern', e.pattern, { ro: true, text: true }) + field('pp-area', 'Area', n4(e.loops.reduce((s, l, i) => s + (i ? -1 : 1) * loopArea(l), 0)), { ro: true });
     h += '</div>';
   }
-  box.innerHTML = h;
+  box.innerHTML = h; { const cb = $("#pp-copy"); if (cb) cb.onclick = () => copyDetails(ents); }
 }
 $('#pp').addEventListener('change', ev => {
   const ents = doc.ents.filter(e => sel.has(e.id)); if (!ents.length) return; const id = ev.target.id, v = ev.target.value;
@@ -2206,6 +2208,18 @@ function newDrawing() {
   let n = 1; const used = new Set(tabs.map(t => t.doc.name)); while (used.has(`Untitled-${n}.dxf`)) n++;
   openDocTab(newDoc(), `Untitled-${n}.dxf`);
 }
+
+
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { }
+  try { const t = document.createElement('textarea'); t.value = text; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); const ok = document.execCommand('copy'); t.remove(); return ok; } catch (e) { return false; }
+}
+async function copyDetails(ents) {
+  const text = ents.map(describeEnt).join('\n');
+  toast(await copyText(text) ? `Details of ${ents.length} object${ents.length > 1 ? 's' : ''} copied to the clipboard as text.` : 'The browser blocked clipboard access.');
+}
+def(['COPYDETAILS', 'CD'], async () => { const ents = await getSel(); await copyDetails(ents); sel.clear(); return false; }, 'Copy the details of selected objects (type, layer, coordinates, length) to the clipboard as text');
+def(['COPYHIST'], async () => { const t = [...histEl.children].map(d => d.textContent).join('\n'); toast(await copyText(t) ? 'Command history copied to the clipboard.' : 'The browser blocked clipboard access.'); }, 'Copy the command history to the clipboard');
 
 // ---------- copy and paste between tabs ----------
 let clip = null;

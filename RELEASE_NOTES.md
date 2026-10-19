@@ -2,6 +2,9 @@
 
 Website: https://dwg.jskrnh.xyz
 
+## v1.3
+- **Copy to clipboard.** "Copy details to clipboard" button in Properties, plus `COPYDETAILS` (CD): copies type, layer, coordinates and length of the selected objects as plain text. `COPYHIST` copies the command history.
+
 ## v1.2
 - **Fix: DWG files are now selectable and editable.** Layer lock and frozen flags were read wrongly, so every layer opened locked. They now come from the file's real flags, and clicking an object on a genuinely locked layer tells you why.
 - **Drawing tabs.** Open several DWG/DXF files at once (Open accepts multiple files, or drop them on the canvas). Each tab keeps its own undo history, view and unsaved-changes marker. Close with ×, or middle-click; closing unsaved work asks you to click twice.
