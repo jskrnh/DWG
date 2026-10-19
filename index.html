@@ -1,0 +1,2106 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="description" content="DraftBench — browser-based 2D CAD: open DWG/DXF, draft, save DXF, plot PDF."><title>DraftBench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-screen workstation — title bar, ribbon of command groups, model-space canvas with a side panel, command line and status bar below. */
+:root {
+  --bg: #e9ebee; --panel: #f6f7f8; --line: #cfd4da; --fg: #1d2329; --muted: #5d6874;
+  --accent: #2457c5; --accent-ink: #ffffff; --accent-soft: #dbe5fa; --warn: #a3450f; --ok: #22663a;
+  --canvas: #fbfbf9; --canvas-grid: #c3c8cf; --canvas-grid-major: #dfe3e8; --ink: #15191d; --ink-canvas: #15191d;
+  --sel: #2457c5; --hover: #c25b00; --snap: #c48800; --grip: #2457c5;
+  --box-win: rgba(36,87,197,.10); --box-cross: rgba(34,102,58,.10);
+  --font-ui: "IBM Plex Sans Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r: 4px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12161b; --panel: #181d23; --line: #2b333c; --fg: #dde3ea; --muted: #8e99a6;
+  --accent: #7ea6ff; --accent-ink: #0d1420; --accent-soft: #1f2c47; --warn: #ffa36b; --ok: #79d39a;
+  --canvas: #1d232a; --canvas-grid: #3a444f; --canvas-grid-major: #2d353e; --ink: #eef2f6; --ink-canvas: #eef2f6;
+  --sel: #7ea6ff; --hover: #ffad5c; --snap: #ffcc33; --grip: #7ea6ff;
+  --box-win: rgba(126,166,255,.12); --box-cross: rgba(121,211,154,.12); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12161b; --panel: #181d23; --line: #2b333c; --fg: #dde3ea; --muted: #8e99a6;
+  --accent: #7ea6ff; --accent-ink: #0d1420; --accent-soft: #1f2c47; --warn: #ffa36b; --ok: #79d39a;
+  --canvas: #1d232a; --canvas-grid: #3a444f; --canvas-grid-major: #2d353e; --ink: #eef2f6; --ink-canvas: #eef2f6;
+  --sel: #7ea6ff; --hover: #ffad5c; --snap: #ffcc33; --grip: #7ea6ff;
+  --box-win: rgba(126,166,255,.12); --box-cross: rgba(121,211,154,.12); color-scheme: dark }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.35 var(--font-ui); overflow: hidden;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.app { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; gap: 0; }
+
+/* title bar */
+.top { display: flex; align-items: center; gap: 12px; padding-block: 8px; min-width: 0; }
+.brand { display: flex; align-items: baseline; gap: 8px; font-weight: 600; letter-spacing: .02em; white-space: nowrap; }
+.brand b { font-family: var(--font-mono); font-weight: 600; font-size: 15px; }
+.brand b i { font-style: normal; color: var(--accent); }
+.docname { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.flag { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--warn); border: 1px solid currentColor; border-radius: 3px; padding: 0 5px; white-space: nowrap; }
+.top .spacer { flex: 1; }
+.filebtns { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; min-width: 0; scrollbar-width: none; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: var(--r); padding: 5px 11px; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.icon { padding: 5px 9px; font-family: var(--font-mono); }
+
+/* ribbon */
+.ribbon { display: flex; gap: 0; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r) var(--r) 0 0; background: var(--panel); scrollbar-width: thin; }
+.grp { display: flex; flex-direction: column; padding: 6px 8px 4px; border-right: 1px solid var(--line); flex: none; }
+.grp:last-child { border-right: 0; }
+.grp .tools { display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, auto); gap: 2px 2px; }
+.grp h2 { margin: 3px 0 0; font-size: 10.5px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: center; }
+.tool { display: flex; align-items: center; gap: 6px; border: 1px solid transparent; background: none; border-radius: 3px; padding: 3px 7px 3px 5px; text-align: left; white-space: nowrap; font-size: 13px; }
+.tool svg { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.tool kbd { font: 500 10px var(--font-mono); color: var(--muted); margin-left: auto; padding-left: 6px; }
+.tool:hover { background: var(--accent-soft); }
+.tool.active, .tool[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.tool.active kbd, .tool[aria-pressed="true"] kbd { color: inherit; opacity: .8; }
+
+/* main */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-height: 0; border-inline: 1px solid var(--line); }
+.stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+.stage.drop::after { content: "Drop a DWG or DXF to open it"; position: absolute; inset: 12px; border: 2px dashed var(--accent); border-radius: 8px; display: grid; place-items: center; background: var(--box-win); color: var(--fg); font-size: 16px; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: none; display: block; }
+.ucs { position: absolute; left: 12px; bottom: 10px; pointer-events: none; font: 600 10px var(--font-mono); color: var(--muted); }
+.side { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+.tabs { display: flex; border-bottom: 1px solid var(--line); }
+.tabs button { flex: 1; background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 6px 6px; font-weight: 500; color: var(--muted); }
+.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.pane { padding: 10px 12px; overflow: auto; min-height: 0; flex: 1; }
+.cur-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 8px; align-items: center; margin-bottom: 10px; font-size: 12.5px; color: var(--muted); }
+.cur-row select { min-width: 0; width: 100%; }
+select, input[type=text], input:not([type]), input[type=number], textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 3px; padding: 3px 6px; min-width: 0; }
+textarea { resize: vertical; width: 100%; font-family: var(--font-mono); font-size: 12.5px; }
+#layers { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+#layers li { display: grid; grid-template-columns: 22px 34px 38px 52px minmax(0, 1fr) auto; gap: 4px; align-items: center; padding: 2px 4px; border-radius: 3px; font-size: 12.5px; }
+#layers li.cur { background: var(--accent-soft); }
+#layers button { background: none; border: 1px solid transparent; border-radius: 3px; padding: 1px 3px; font-size: 11.5px; color: var(--muted); }
+#layers button:hover { border-color: var(--line); }
+#layers .lcur { color: var(--accent); font-size: 13px; }
+#layers .lon[aria-pressed="false"] { color: var(--warn); }
+#layers .llock[aria-pressed="true"] { color: var(--warn); }
+.lcol { display: flex; align-items: center; gap: 3px; }
+.lcol input { width: 34px; padding: 1px 2px; font: 11px var(--font-mono); }
+.sw { width: 12px; height: 12px; border-radius: 2px; border: 1px solid var(--line); flex: none; display: inline-block; }
+.lname { width: 100%; border-color: transparent !important; background: transparent !important; padding: 1px 4px !important; font-family: var(--font-mono); font-size: 12px; }
+.lname:focus { border-color: var(--accent) !important; background: var(--bg) !important; }
+.lcount { font: 11px var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.layer-actions { display: flex; gap: 6px; margin-top: 10px; }
+.layer-actions .btn { padding: 3px 9px; font-size: 12.5px; }
+.pp-type { font-weight: 600; margin-bottom: 8px; }
+.fld { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 8px; margin-bottom: 5px; font-size: 12.5px; }
+.fld > span { color: var(--muted); }
+.fld input { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; width: 100%; }
+.fld input[readonly] { background: transparent; border-color: transparent; color: var(--muted); }
+.fld.wide { grid-template-columns: 1fr; gap: 3px; }
+.fld.chk input { width: auto; justify-self: start; }
+.pp-geo { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 8px; }
+.hint { color: var(--muted); font-size: 12.5px; margin: 0 0 10px; max-width: 60ch; }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 12.5px; margin: 0 0 10px; }
+.facts dt { color: var(--muted); } .facts dd { margin: 0; font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
+
+/* command line */
+.cmd { border: 1px solid var(--line); border-top: 0; background: var(--panel); font-family: var(--font-mono); font-size: 12.5px; }
+.hist { height: 76px; overflow-y: auto; padding: 4px 10px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.hist .cmd { all: unset; display: block; color: var(--fg); font-weight: 600; }
+.hist .echo { color: var(--fg); } .hist .out { color: var(--ok); } .hist .err { color: var(--warn); } .hist .dim { opacity: .85; }
+.cmdline { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.prompt { color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.kw { background: none; border: 0; padding: 0 2px; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; font: inherit; }
+#cmdin { flex: 1; min-width: 120px; border: 0; background: transparent; outline: none; padding: 2px 0; font-family: var(--font-mono); }
+#cmdin:focus-visible { outline: none; }
+.cmdline:focus-within { box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* status */
+.status { display: flex; align-items: center; gap: 4px; padding-block: 4px 6px; font-size: 12px; flex-wrap: wrap; }
+.coords { font-family: var(--font-mono); font-variant-numeric: tabular-nums; min-width: 22ch; color: var(--fg); }
+.units { font-family: var(--font-mono); color: var(--muted); margin-right: 8px; }
+.tg { border: 1px solid var(--line); background: var(--panel); border-radius: 3px; padding: 1px 7px; font: 600 11px var(--font-mono); letter-spacing: .04em; color: var(--muted); }
+.tg[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.status .spacer { flex: 1; }
+.selcount { color: var(--muted); font-family: var(--font-mono); }
+#btn-panel { display: none; }
+
+/* dialogs */
+.modal { position: fixed; inset: 0; background: rgba(10,14,20,.45); display: grid; place-items: center; z-index: 20; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); }
+.dlg { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; width: min(760px, 100%); max-height: 100%; overflow: auto; padding: 16px 18px; box-shadow: 0 18px 50px rgba(0,0,0,.3); }
+.dlg h3 { margin: 0 0 4px; font-size: 18px; font-weight: 600; text-wrap: balance; }
+.dlg .sub { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+.plotgrid { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; }
+.plotgrid .fld { grid-template-columns: 70px minmax(0, 1fr); }
+#pl-prev { width: 100%; height: 300px; background: var(--bg); border-radius: 4px; display: block; }
+.dlg .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+.dlg .row .info { margin-right: auto; color: var(--muted); font-size: 12.5px; font-family: var(--font-mono); }
+#tx-area { height: 300px; white-space: pre; overflow: auto; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); background: var(--fg); color: var(--bg); padding: 8px 14px; border-radius: 6px; z-index: 30; max-width: calc(100% - 32px); font-size: 13px; }
+.busy { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); padding: 6px 14px; border-radius: 20px; font-size: 13px; z-index: 5; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
+
+@media (max-width: 860px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .side { position: fixed; right: 0; top: 0; bottom: 0; width: min(320px, 88vw); z-index: 15; transform: translateX(100%); transition: transform .2s; padding-top: env(safe-area-inset-top, 0px); padding-right: env(safe-area-inset-right, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); box-shadow: -10px 0 30px rgba(0,0,0,.25); }
+  body.panel-open .side { transform: none; }
+  #btn-panel { display: inline-block; }
+  .filebtns .opt { display: none; }
+  .hist { height: 52px; }
+  .plotgrid { grid-template-columns: 1fr; }
+  .docname { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .side { transition: none; } }
+@media (hover: none) { #cv { cursor: default; } }
+</style></head><body>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><b>Draft<i>Bench</i></b></div>
+    <span class="docname" id="docname">Example</span>
+    <span class="flag" id="example-flag">Example drawing</span>
+    <span class="spacer"></span>
+    <div class="filebtns">
+      <button class="btn opt" id="btn-new" type="button">New</button>
+      <button class="btn primary" id="btn-open" type="button">Open DWG / DXF</button>
+      <button class="btn" id="btn-save" type="button" title="Ctrl+S">Save DXF</button>
+      <button class="btn opt" id="btn-svg" type="button">Export SVG</button>
+      <button class="btn" id="btn-plot" type="button">Plot PDF</button>
+      <button class="btn icon" id="btn-undo" type="button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+      <button class="btn icon opt" id="btn-redo" type="button" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
+    </div>
+    <input type="file" id="file" accept=".dwg,.dxf" hidden>
+  </header>
+
+  <nav class="ribbon" aria-label="Commands">
+    <section class="grp"><div class="tools">
+      <button class="tool" data-cmd="LINE" type="button"><svg viewBox="0 0 18 18"><path d="M3 15 15 3"/><circle cx="3" cy="15" r="1.2"/><circle cx="15" cy="3" r="1.2"/></svg>Line<kbd>L</kbd></button>
+      <button class="tool" data-cmd="PLINE" type="button"><svg viewBox="0 0 18 18"><path d="M2 15 7 6l4 7 5-10"/></svg>Polyline<kbd>PL</kbd></button>
+      <button class="tool" data-cmd="CIRCLE" type="button"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="6.5"/><path d="M9 9h6.5"/></svg>Circle<kbd>C</kbd></button>
+      <button class="tool" data-cmd="ARC" type="button"><svg viewBox="0 0 18 18"><path d="M2.5 14a7 7 0 0 1 13 0"/></svg>Arc<kbd>A</kbd></button>
+      <button class="tool" data-cmd="RECTANG" type="button"><svg viewBox="0 0 18 18"><rect x="2.5" y="4.5" width="13" height="9"/></svg>Rectangle<kbd>REC</kbd></button>
+      <button class="tool" data-cmd="POLYGON" type="button"><svg viewBox="0 0 18 18"><path d="M9 2.5 15.2 7 12.8 14.5H5.2L2.8 7z"/></svg>Polygon<kbd>POL</kbd></button>
+      <button class="tool" data-cmd="ELLIPSE" type="button"><svg viewBox="0 0 18 18"><ellipse cx="9" cy="9" rx="7" ry="4.2"/></svg>Ellipse<kbd>EL</kbd></button>
+      <button class="tool" data-cmd="HATCH" type="button"><svg viewBox="0 0 18 18"><rect x="2.5" y="2.5" width="13" height="13"/><path d="M2.5 9 9 2.5M2.5 15.5 15.5 2.5M9 15.5l6.5-6.5"/></svg>Hatch<kbd>H</kbd></button>
+      <button class="tool" data-cmd="TEXT" type="button"><svg viewBox="0 0 18 18"><path d="M3.5 4h11M9 4v11"/></svg>Text<kbd>T</kbd></button>
+      <button class="tool" data-cmd="XLINE" type="button"><svg viewBox="0 0 18 18"><path d="M1 13 17 5" stroke-dasharray="2 2"/><circle cx="9" cy="9" r="1.3"/></svg>Constr. line<kbd>XL</kbd></button>
+    </div><h2>Draw</h2></section>
+    <section class="grp"><div class="tools">
+      <button class="tool" data-cmd="MOVE" type="button"><svg viewBox="0 0 18 18"><path d="M9 1.5v15M1.5 9h15M9 1.5 7 3.5M9 1.5l2 2M9 16.5l-2-2M9 16.5l2-2M1.5 9l2-2M1.5 9l2 2M16.5 9l-2-2M16.5 9l-2 2"/></svg>Move<kbd>M</kbd></button>
+      <button class="tool" data-cmd="COPY" type="button"><svg viewBox="0 0 18 18"><rect x="2.5" y="5.5" width="8" height="8"/><rect x="7.5" y="2.5" width="8" height="8"/></svg>Copy<kbd>CO</kbd></button>
+      <button class="tool" data-cmd="ROTATE" type="button"><svg viewBox="0 0 18 18"><path d="M14.5 9A5.5 5.5 0 1 1 9 3.5h3"/><path d="m10 1.5 2 2-2 2"/></svg>Rotate<kbd>RO</kbd></button>
+      <button class="tool" data-cmd="SCALE" type="button"><svg viewBox="0 0 18 18"><rect x="2.5" y="8.5" width="7" height="7"/><path d="M9.5 2.5h6v6M15.5 2.5 9.5 8.5"/></svg>Scale<kbd>SC</kbd></button>
+      <button class="tool" data-cmd="MIRROR" type="button"><svg viewBox="0 0 18 18"><path d="M9 1.5v15" stroke-dasharray="2 2"/><path d="M7 4 2.5 13H7zM11 4l4.5 9H11z"/></svg>Mirror<kbd>MI</kbd></button>
+      <button class="tool" data-cmd="OFFSET" type="button"><svg viewBox="0 0 18 18"><path d="M2.5 15.5v-8a5 5 0 0 1 5-5h8"/><path d="M6.5 15.5v-8a1 1 0 0 1 1-1h8"/></svg>Offset<kbd>O</kbd></button>
+      <button class="tool" data-cmd="TRIM" type="button"><svg viewBox="0 0 18 18"><path d="M9 1.5v15M2.5 9H9"/><path d="M9 9h6.5" stroke-dasharray="1.5 2"/></svg>Trim<kbd>TR</kbd></button>
+      <button class="tool" data-cmd="EXTEND" type="button"><svg viewBox="0 0 18 18"><path d="M15 1.5v15M2.5 9H8"/><path d="M8 9h7" stroke-dasharray="1.5 2"/></svg>Extend<kbd>EX</kbd></button>
+      <button class="tool" data-cmd="FILLET" type="button"><svg viewBox="0 0 18 18"><path d="M2.5 15.5V9.5a6 6 0 0 1 6-6h7"/></svg>Fillet<kbd>F</kbd></button>
+      <button class="tool" data-cmd="ARRAY" type="button"><svg viewBox="0 0 18 18"><rect x="2" y="2" width="4" height="4"/><rect x="12" y="2" width="4" height="4"/><rect x="2" y="12" width="4" height="4"/><rect x="12" y="12" width="4" height="4"/></svg>Array<kbd>AR</kbd></button>
+      <button class="tool" data-cmd="EXPLODE" type="button"><svg viewBox="0 0 18 18"><path d="M9 2v3M9 13v3M2 9h3M13 9h3M4 4l2 2M12 12l2 2M14 4l-2 2M4 14l2-2"/></svg>Explode<kbd>X</kbd></button>
+      <button class="tool" data-cmd="ERASE" type="button"><svg viewBox="0 0 18 18"><path d="M3 5h12M7 5V3h4v2M5 5l1 10h6l1-10"/></svg>Erase<kbd>E</kbd></button>
+    </div><h2>Modify</h2></section>
+    <section class="grp"><div class="tools">
+      <button class="tool" data-cmd="DIMLINEAR" type="button"><svg viewBox="0 0 18 18"><path d="M2.5 4v10M15.5 4v10M2.5 11h13M2.5 11l2-1.2v2.4zM15.5 11l-2-1.2v2.4z"/></svg>Linear<kbd>DLI</kbd></button>
+      <button class="tool" data-cmd="DIMALIGNED" type="button"><svg viewBox="0 0 18 18"><path d="M3 12 12 3M6 15l9-9M3 12l3 3M12 3l3 3"/></svg>Aligned<kbd>DAL</kbd></button>
+      <button class="tool" data-cmd="DIST" type="button"><svg viewBox="0 0 18 18"><path d="M2 12h14v4H2zM5 12v2M8 12v2.5M11 12v2M14 12v2"/></svg>Distance<kbd>DI</kbd></button>
+      <button class="tool" data-cmd="AREA" type="button"><svg viewBox="0 0 18 18"><path d="M3 15 5 3l10 4-2 8z"/></svg>Area<kbd>AA</kbd></button>
+      <button class="tool" data-cmd="LIST" type="button"><svg viewBox="0 0 18 18"><path d="M3 4h12M3 9h12M3 14h8"/></svg>List<kbd>LI</kbd></button>
+      <button class="tool" data-cmd="MATCHPROP" type="button"><svg viewBox="0 0 18 18"><path d="M4 14 12 6M11 3l4 4-2 2-4-4z"/></svg>Match props<kbd>MA</kbd></button>
+    </div><h2>Annotate &amp; inquire</h2></section>
+    <section class="grp"><div class="tools">
+      <button class="tool" data-cmd="BLOCK" type="button"><svg viewBox="0 0 18 18"><path d="M9 2 16 6v6l-7 4-7-4V6z M2 6l7 4 7-4M9 10v6"/></svg>Make block<kbd>B</kbd></button>
+      <button class="tool" data-cmd="INSERT" type="button"><svg viewBox="0 0 18 18"><path d="M9 6 15 9v5l-6 3-6-3V9zM9 1v6M7 5l2 2 2-2"/></svg>Insert<kbd>I</kbd></button>
+    </div><h2>Blocks</h2></section>
+    <section class="grp"><div class="tools">
+      <button class="tool" id="btn-ze" type="button"><svg viewBox="0 0 18 18"><path d="M2 6V2h4M12 2h4v4M16 12v4h-4M6 16H2v-4"/></svg>Extents<kbd>ZE</kbd></button>
+      <button class="tool" data-cmd="ZOOM" type="button"><svg viewBox="0 0 18 18"><circle cx="7.5" cy="7.5" r="5"/><path d="m11 11 5 5"/></svg>Window<kbd>Z</kbd></button>
+      <button class="tool" id="btn-pan" type="button" aria-pressed="false"><svg viewBox="0 0 18 18"><path d="M6 9V4a1 1 0 0 1 2 0v4V3a1 1 0 0 1 2 0v5V4a1 1 0 0 1 2 0v5-2a1 1 0 0 1 2 0v4a6 6 0 0 1-6 6c-2 0-3-1-4.5-3L3 11a1 1 0 0 1 1.5-1.3z"/></svg>Pan<kbd>P</kbd></button>
+      <button class="tool" data-cmd="HELP" type="button"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="7"/><path d="M7 7a2 2 0 1 1 2.5 1.9c-.4.2-.5.5-.5 1.1M9 13v.01"/></svg>Commands<kbd>?</kbd></button>
+    </div><h2>View</h2></section>
+  </nav>
+
+  <div class="main">
+    <div class="stage" id="stage">
+      <canvas id="cv" aria-label="Drawing canvas"></canvas>
+      <div class="ucs" aria-hidden="true">Y↑ X→ · MODEL</div>
+      <div class="busy" id="busy" hidden></div>
+    </div>
+    <aside class="side" aria-label="Panels">
+      <div class="tabs" role="tablist">
+        <button data-tab="props" role="tab" aria-selected="true" type="button">Properties</button>
+        <button data-tab="layers" role="tab" aria-selected="false" type="button">Layers</button>
+      </div>
+      <div class="pane" id="pane-props">
+        <div class="cur-row">
+          <span>Current layer</span><select id="clayer" aria-label="Current layer"></select>
+          <span>New color</span><select id="ccolor" aria-label="Color for new objects"></select>
+          <span>New linetype</span><select id="clt" aria-label="Linetype for new objects"></select>
+        </div>
+        <div id="pp"></div>
+      </div>
+      <div class="pane" id="pane-layers" hidden>
+        <ul id="layers"></ul>
+        <div class="layer-actions"><button class="btn" id="layer-new" type="button">New layer</button><button class="btn" id="layer-del" type="button">Purge empty</button></div>
+        <p class="hint" style="margin-top:12px">● sets the current layer. Off hides a layer; Lock keeps it visible but unselectable. Type an ACI number (1–255) to recolor; rename by editing the name.</p>
+      </div>
+    </aside>
+  </div>
+
+  <div class="cmd">
+    <div class="hist" id="hist" aria-live="polite"></div>
+    <div class="cmdline"><span class="prompt" id="prompt">Command:</span><input id="cmdin" autocomplete="off" spellcheck="false" aria-label="Command line"></div>
+  </div>
+  <div class="status">
+    <span class="coords" id="coords">0.0000, 0.0000</span><span class="units" id="units">mm</span>
+    <button class="tg" data-toggle="grid" type="button" title="F7">GRID</button>
+    <button class="tg" data-toggle="snap" type="button" title="F9 · set spacing with SN">SNAP</button>
+    <button class="tg" data-toggle="ortho" type="button" title="F8">ORTHO</button>
+    <button class="tg" data-toggle="osnap" type="button" title="F3 · endpoint, midpoint, center, quadrant, intersection, perpendicular">OSNAP</button>
+    <span class="spacer"></span>
+    <span class="selcount" id="selcount"></span>
+    <button class="btn" id="btn-panel" type="button">Panels</button>
+  </div>
+</div>
+
+<div class="modal" id="plot" hidden>
+  <div class="dlg" role="dialog" aria-labelledby="pl-h">
+    <h3 id="pl-h">Plot to PDF</h3>
+    <p class="sub">Vector PDF at a true scale. Drawing units are converted to millimetres on paper.</p>
+    <div class="plotgrid">
+      <div>
+        <label class="fld"><span>Sheet</span><select id="pl-sheet"></select></label>
+        <label class="fld"><span>Orient</span><select id="pl-orient"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></label>
+        <label class="fld"><span>Area</span><select id="pl-area"><option value="extents">Extents</option><option value="display">Display</option></select></label>
+        <label class="fld"><span>Scale</span><input id="pl-scale" value="Fit" placeholder="Fit, 1:2, 2:1"></label>
+        <label class="fld"><span>Pen mm</span><select id="pl-lw"><option>0.13</option><option>0.18</option><option selected>0.25</option><option>0.35</option><option>0.5</option></select></label>
+        <label class="fld chk"><span>Black ink</span><input type="checkbox" id="pl-mono" checked></label>
+      </div>
+      <canvas id="pl-prev" aria-label="Sheet preview"></canvas>
+    </div>
+    <div class="row"><span class="info" id="pl-info"></span><button class="btn" id="pl-cancel" type="button">Cancel</button><button class="btn primary" id="pl-go" type="button">Plot PDF</button></div>
+  </div>
+</div>
+
+<div class="modal" id="textout" hidden>
+  <div class="dlg" role="dialog" aria-labelledby="tx-title">
+    <h3 id="tx-title">File contents</h3>
+    <p class="sub" id="tx-name"></p>
+    <textarea id="tx-area" spellcheck="false" aria-label="File text" readonly></textarea>
+    <div class="row"><button class="btn" id="tx-close" type="button">Close</button><button class="btn primary" id="tx-copy" type="button">Copy all</button></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+// ===== DraftBench core: model, geometry, DXF/DWG IO (no DOM) =====
+const TAU = Math.PI * 2;
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+
+// ---------- AutoCAD Color Index ----------
+const ACI = (() => {
+  const t = new Array(256).fill('#ffffff');
+  const fixed = { 1: '#ff0000', 2: '#ffff00', 3: '#00ff00', 4: '#00ffff', 5: '#0000ff', 6: '#ff00ff', 7: '#ffffff', 8: '#808080', 9: '#c0c0c0' };
+  for (const k in fixed) t[k] = fixed[k];
+  const vals = [1, 1, 0.8, 0.8, 0.65, 0.65, 0.5, 0.5, 0.3, 0.3];
+  const hex = v => Math.round(v * 255).toString(16).padStart(2, '0');
+  for (let i = 10; i < 250; i++) {
+    const h = Math.floor((i - 10) / 10) * 15, k = (i - 10) % 10, v = vals[k], s = k % 2 ? 0.5 : 1;
+    const f = n => { const kk = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(kk, 4 - kk, 1)); };
+    t[i] = '#' + hex(f(5)) + hex(f(3)) + hex(f(1));
+  }
+  [51, 80, 105, 130, 190, 255].forEach((g, j) => { const x = g.toString(16).padStart(2, '0'); t[250 + j] = '#' + x + x + x; });
+  return t;
+})();
+
+// ---------- document ----------
+let _id = 1;
+function newDoc() {
+  const layers = new Map();
+  layers.set('0', { name: '0', color: 7, on: true, locked: false, lt: 'CONTINUOUS' });
+  return { layers, blocks: new Map(), ents: [], units: 4, clayer: '0', name: 'Untitled' };
+}
+function mk(type, props, layer, color) { return Object.assign({ id: _id++, type, layer: layer || '0', color: color == null ? 256 : color }, props); }
+
+// ---------- vector helpers ----------
+const P = (x, y) => ({ x, y });
+const sub = (a, b) => P(a.x - b.x, a.y - b.y), add = (a, b) => P(a.x + b.x, a.y + b.y);
+const mul = (a, s) => P(a.x * s, a.y * s), dot = (a, b) => a.x * b.x + a.y * b.y, cross = (a, b) => a.x * b.y - a.y * b.x;
+const len = a => Math.hypot(a.x, a.y), dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const ang = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
+const polar = (c, r, t) => P(c.x + r * Math.cos(t), c.y + r * Math.sin(t));
+const normA = t => { t %= TAU; return t < 0 ? t + TAU : t; };
+const inSweep = (t, sa, ea) => { const s = normA(ea - sa) || TAU; return normA(t - sa) <= s + 1e-9; };
+
+// affine matrix {a,b,c,d,e,f}: x' = a x + c y + e ; y' = b x + d y + f
+const MI = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+const mMul = (m, n) => ({ a: m.a * n.a + m.c * n.b, b: m.b * n.a + m.d * n.b, c: m.a * n.c + m.c * n.d, d: m.b * n.c + m.d * n.d, e: m.a * n.e + m.c * n.f + m.e, f: m.b * n.e + m.d * n.f + m.f });
+const tp = (m, p) => P(m.a * p.x + m.c * p.y + m.e, m.b * p.x + m.d * p.y + m.f);
+const tv = (m, p) => P(m.a * p.x + m.c * p.y, m.b * p.x + m.d * p.y);
+const mTrans = (dx, dy) => ({ a: 1, b: 0, c: 0, d: 1, e: dx, f: dy });
+const mRot = (t, c) => { const co = Math.cos(t), si = Math.sin(t), cx = c ? c.x : 0, cy = c ? c.y : 0; return { a: co, b: si, c: -si, d: co, e: cx - co * cx + si * cy, f: cy - si * cx - co * cy }; };
+const mScale = (s, c) => ({ a: s, b: 0, c: 0, d: s, e: c.x - s * c.x, f: c.y - s * c.y });
+function mMirror(p1, p2) { const t = ang(p1, p2), co = Math.cos(2 * t), si = Math.sin(2 * t); const m = { a: co, b: si, c: si, d: -co, e: 0, f: 0 }; const q = tp(m, p1); m.e = p1.x - q.x; m.f = p1.y - q.y; return m; }
+const mDet = m => m.a * m.d - m.b * m.c;
+function insertM(e, blk) {
+  const base = blk ? blk.base : P(0, 0);
+  let m = mTrans(-base.x, -base.y);
+  m = mMul({ a: e.sx, b: 0, c: 0, d: e.sy, e: 0, f: 0 }, m);
+  m = mMul(mRot(e.rot || 0), m);
+  return mMul(mTrans(e.p.x, e.p.y), m);
+}
+
+// ---------- bulge / arc ----------
+function bulgeArc(p, q, b) {
+  const th = 4 * Math.atan(b), ch = dist(p, q);
+  const r = ch / (2 * Math.sin(Math.abs(th) / 2));
+  const mid = mul(add(p, q), 0.5), h = Math.sqrt(Math.max(0, r * r - ch * ch / 4));
+  const dir = mul(sub(q, p), 1 / ch), nrm = P(-dir.y, dir.x);
+  const sgn = (Math.abs(th) > Math.PI ? -1 : 1) * Math.sign(b);
+  const c = add(mid, mul(nrm, h * sgn));
+  let sa = ang(c, p), ea = ang(c, q);
+  if (b < 0) [sa, ea] = [ea, sa];
+  return { c, r, sa, ea };
+}
+function arcBulge(sa, ea, ccw) { const sw = normA(ea - sa) || TAU; return Math.tan(sw / 4) * (ccw ? 1 : -1); }
+function tessArc(c, r, sa, ea, n) {
+  const sw = normA(ea - sa) || TAU; n = n || Math.max(8, Math.ceil(sw / (TAU / 72)));
+  const out = []; for (let i = 0; i <= n; i++) out.push(polar(c, r, sa + sw * i / n)); return out;
+}
+function ellipsePt(e, t) { const M = e.maj, m = P(-M.y * e.ratio, M.x * e.ratio); return P(e.c.x + M.x * Math.cos(t) + m.x * Math.sin(t), e.c.y + M.y * Math.cos(t) + m.y * Math.sin(t)); }
+function tessEllipse(e) { let sw = normA(e.ea - e.sa); if (sw < 1e-9) sw = TAU; const n = 96, o = []; for (let i = 0; i <= n; i++) o.push(ellipsePt(e, e.sa + sw * i / n)); return o; }
+
+// ---------- splines ----------
+function tessSpline(e) {
+  if (e.ctrl && e.ctrl.length >= 2 && e.knots && e.knots.length === e.ctrl.length + e.deg + 1) {
+    const k = e.knots, p = e.deg, n = e.ctrl.length, w = e.w && e.w.length === n ? e.w : null;
+    const t0 = k[p], t1 = k[n], out = [], N = Math.max(40, n * 12);
+    for (let i = 0; i <= N; i++) {
+      let t = t0 + (t1 - t0) * i / N; if (i === N) t = t1 - 1e-10;
+      let s = p; while (s < n - 1 && t >= k[s + 1]) s++;
+      const d = []; for (let j = 0; j <= p; j++) { const c = e.ctrl[s - p + j], ww = w ? w[s - p + j] : 1; d.push([c.x * ww, c.y * ww, ww]); }
+      for (let r = 1; r <= p; r++) for (let j = p; j >= r; j--) {
+        const a = (t - k[j + s - p]) / ((k[j + 1 + s - r] - k[j + s - p]) || 1);
+        d[j] = [(1 - a) * d[j - 1][0] + a * d[j][0], (1 - a) * d[j - 1][1] + a * d[j][1], (1 - a) * d[j - 1][2] + a * d[j][2]];
+      }
+      out.push(P(d[p][0] / d[p][2], d[p][1] / d[p][2]));
+    }
+    return out;
+  }
+  const f = (e.fit && e.fit.length >= 2) ? e.fit : (e.ctrl || []);
+  if (f.length < 3) return f.slice();
+  const out = [];
+  for (let i = 0; i < f.length - 1; i++) {
+    const p0 = f[Math.max(0, i - 1)], p1 = f[i], p2 = f[i + 1], p3 = f[Math.min(f.length - 1, i + 2)];
+    for (let j = 0; j < 12; j++) {
+      const t = j / 12, t2 = t * t, t3 = t2 * t;
+      out.push(P(0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+        0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)));
+    }
+  }
+  out.push(f[f.length - 1]); return out;
+}
+
+// ---------- text helpers ----------
+function cleanMText(s) {
+  return String(s || '')
+    .replace(/\\P/g, '\n').replace(/\\~/g, ' ')
+    .replace(/\\S([^;^#\/]*)[\^#\/]([^;]*);/g, '$1/$2')
+    .replace(/\\[ACcFfHhQTWp][^;\\]*;/g, '').replace(/\\[LlOoKkNX]/g, '')
+    .replace(/\\\\/g, '\\').replace(/[{}]/g, '');
+}
+function cleanText(s) { return String(s || '').replace(/%%[cC]/g, 'Ø').replace(/%%[dD]/g, '°').replace(/%%[pP]/g, '±').replace(/%%[uUoO]/g, '').replace(/%%%/g, '%'); }
+function textLines(e) { return e.type === 'MTEXT' ? cleanText(cleanMText(e.text)).split('\n') : [cleanText(e.text)]; }
+const CHAR_W = 0.62;
+function textBox(e) { // local box in text frame: [x0,y0,x1,y1] relative to insertion, unrotated
+  const ls = textLines(e), h = e.h || 1;
+  const w = Math.max(1, ...ls.map(l => l.length)) * h * CHAR_W;
+  if (e.type === 'TEXT') {
+    let x0 = 0, y0 = 0;
+    const ha = e.ha || 0, va = e.va || 0;
+    if (ha === 1 || ha === 4) x0 = -w / 2; else if (ha === 2) x0 = -w;
+    if (va === 2 || ha === 4) y0 = -h / 2; else if (va === 3) y0 = -h; else if (va === 1) y0 = 0;
+    return [x0, y0, x0 + w, y0 + h];
+  }
+  const ww = Math.max(w, 0), H = h * (1 + (ls.length - 1) * 1.66);
+  const at = e.attach || 1, col = (at - 1) % 3, row = Math.floor((at - 1) / 3);
+  const x0 = -ww * col / 2, y1 = row === 0 ? 0 : row === 1 ? H / 2 : H;
+  return [x0, y1 - H, x0 + ww, y1];
+}
+function textAnchor(e) { return (e.type === 'TEXT' && (e.ha || e.va) && e.p2) ? e.p2 : e.p; }
+
+// ---------- primitives (for picking, snapping, intersections) ----------
+// {t:'S',a,b} | {t:'A',c,r,sa,ea} | {t:'P',p}
+function entPrims(e, doc, depth) {
+  if (e._pr && e._prv === e._v) return e._pr;
+  const out = rawPrims(e, doc, depth || 0);
+  e._pr = out; e._prv = e._v; return out;
+}
+function invalidate(e) { e._v = (e._v || 0) + 1; e._bb = null; }
+function segsOf(pts, closed) { const o = []; for (let i = 0; i < pts.length - 1; i++) o.push({ t: 'S', a: pts[i], b: pts[i + 1] }); if (closed && pts.length > 2) o.push({ t: 'S', a: pts[pts.length - 1], b: pts[0] }); return o; }
+function plPrims(v, closed) {
+  const o = [], n = v.length;
+  for (let i = 0; i < (closed ? n : n - 1); i++) {
+    const p = v[i], q = v[(i + 1) % n];
+    if (p.b && Math.abs(p.b) > 1e-9 && dist(p, q) > 1e-12) { const a = bulgeArc(p, q, p.b); o.push({ t: 'A', c: a.c, r: a.r, sa: a.sa, ea: a.ea }); }
+    else o.push({ t: 'S', a: P(p.x, p.y), b: P(q.x, q.y) });
+  }
+  return o;
+}
+function plPoints(v, closed) { // tessellated
+  const pts = []; const n = v.length;
+  for (let i = 0; i < (closed ? n : n - 1); i++) {
+    const p = v[i], q = v[(i + 1) % n];
+    if (p.b && Math.abs(p.b) > 1e-9) { const a = bulgeArc(p, q, p.b); let t = tessArc(a.c, a.r, a.sa, a.ea, 24); if (p.b < 0) t.reverse(); pts.push(...t.slice(0, -1)); }
+    else pts.push(P(p.x, p.y));
+  }
+  if (!closed && n) pts.push(P(v[n - 1].x, v[n - 1].y)); else if (n) pts.push(P(v[0].x, v[0].y));
+  return pts;
+}
+function dimGeom(e) {
+  // e.p1,e.p2 measured points, e.dl point on dim line, e.mode 'H'|'V'|'A'
+  let dir;
+  if (e.mode === 'H') dir = P(1, 0); else if (e.mode === 'V') dir = P(0, 1); else { const d = sub(e.p2, e.p1); const L = len(d) || 1; dir = P(d.x / L, d.y / L); }
+  const nrm = P(-dir.y, dir.x);
+  const off = dot(sub(e.dl, e.p1), nrm);
+  const a = add(e.p1, mul(nrm, off));
+  const proj = dot(sub(e.p2, e.p1), dir);
+  const b = add(a, mul(dir, proj));
+  const ext = e.ext || 1.25;
+  const sgn = Math.sign(off) || 1;
+  const e1 = [add(e.p1, mul(nrm, sgn * ext * 0.5)), add(a, mul(nrm, sgn * ext))];
+  const e2 = [add(e.p2, mul(nrm, sgn * ext * 0.5)), add(b, mul(nrm, sgn * ext))];
+  const value = Math.abs(proj);
+  return { a, b, e1, e2, dir, nrm, value, sgn };
+}
+function rawPrims(e, doc, depth) {
+  switch (e.type) {
+    case 'LINE': return [{ t: 'S', a: e.a, b: e.b }];
+    case 'XLINE': { const d = e.dir, L = 1e6; return [{ t: 'S', a: e.ray ? e.p : add(e.p, mul(d, -L)), b: add(e.p, mul(d, L)) }]; }
+    case 'CIRCLE': return [{ t: 'A', c: e.c, r: e.r, sa: 0, ea: TAU }];
+    case 'ARC': return [{ t: 'A', c: e.c, r: e.r, sa: e.sa, ea: e.ea }];
+    case 'PLINE': return plPrims(e.v, e.closed);
+    case 'ELLIPSE': return segsOf(tessEllipse(e));
+    case 'SPLINE': return segsOf(tessSpline(e), e.closed);
+    case 'POINT': return [{ t: 'P', p: e.p }];
+    case 'SOLID': return segsOf(e.pts, true);
+    case 'HATCH': return e.loops.flatMap(l => plPrims(l, true));
+    case 'DIM': { const g = dimGeom(e); return [{ t: 'S', a: g.a, b: g.b }, { t: 'S', a: g.e1[0], b: g.e1[1] }, { t: 'S', a: g.e2[0], b: g.e2[1] }]; }
+    case 'TEXT': case 'MTEXT': {
+      const [x0, y0, x1, y1] = textBox(e), m = mMul(mTrans(textAnchor(e).x, textAnchor(e).y), mRot(e.rot || 0));
+      return segsOf([P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1)].map(p => tp(m, p)), true).map(s => (s.textbox = true, s));
+    }
+    case 'INSERT': {
+      const blk = doc && doc.blocks.get(e.name); if (!blk || depth > 6) return [{ t: 'P', p: e.p }];
+      const m = insertM(e, blk), o = [{ t: 'P', p: e.p, ins: true }];
+      for (const be of blk.ents) for (const pr of entPrims(be, doc, depth + 1)) o.push(...xfPrim(pr, m));
+      return o;
+    }
+  }
+  return [];
+}
+function xfPrim(pr, m) {
+  if (pr.t === 'S') return [{ t: 'S', a: tp(m, pr.a), b: tp(m, pr.b), textbox: pr.textbox }];
+  if (pr.t === 'P') return [{ t: 'P', p: tp(m, pr.p) }];
+  const sx = Math.hypot(m.a, m.b), sy = Math.hypot(m.c, m.d);
+  if (Math.abs(sx - sy) < 1e-9) {
+    const p0 = tp(m, polar(pr.c, pr.r, pr.sa)), p1 = tp(m, polar(pr.c, pr.r, pr.ea)), c = tp(m, pr.c);
+    let sa = ang(c, p0), ea = ang(c, p1); const full = normA(pr.ea - pr.sa) < 1e-9 || Math.abs(pr.ea - pr.sa - TAU) < 1e-9;
+    if (full) return [{ t: 'A', c, r: pr.r * sx, sa: 0, ea: TAU }];
+    if (mDet(m) < 0) [sa, ea] = [ea, sa];
+    return [{ t: 'A', c, r: pr.r * sx, sa, ea }];
+  }
+  return segsOf(tessArc(pr.c, pr.r, pr.sa, pr.ea, 48).map(p => tp(m, p)));
+}
+
+// ---------- bounding boxes ----------
+function primBB(pr, bb) {
+  const ext = p => { bb[0] = Math.min(bb[0], p.x); bb[1] = Math.min(bb[1], p.y); bb[2] = Math.max(bb[2], p.x); bb[3] = Math.max(bb[3], p.y); };
+  if (pr.t === 'S') { ext(pr.a); ext(pr.b); }
+  else if (pr.t === 'P') ext(pr.p);
+  else { ext(polar(pr.c, pr.r, pr.sa)); ext(polar(pr.c, pr.r, pr.ea)); for (let k = 0; k < 4; k++) { const t = k * Math.PI / 2; if (inSweep(t, pr.sa, pr.ea)) ext(polar(pr.c, pr.r, t)); } }
+}
+function entBB(e, doc) {
+  if (e._bb && e._bbv === e._v) return e._bb;
+  const bb = [Infinity, Infinity, -Infinity, -Infinity];
+  if (e.type === 'XLINE') { bb[0] = bb[2] = e.p.x; bb[1] = bb[3] = e.p.y; }
+  else for (const pr of entPrims(e, doc)) primBB(pr, bb);
+  e._bb = bb; e._bbv = e._v; return bb;
+}
+function docBB(doc, ents) {
+  const bb = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const e of ents || doc.ents) { const L = doc.layers.get(e.layer); if (L && !L.on) continue; const b = entBB(e, doc); if (!isFinite(b[0])) continue; bb[0] = Math.min(bb[0], b[0]); bb[1] = Math.min(bb[1], b[1]); bb[2] = Math.max(bb[2], b[2]); bb[3] = Math.max(bb[3], b[3]); }
+  return bb;
+}
+
+// ---------- distances & intersections ----------
+function dSeg(p, a, b) { const ab = sub(b, a), L2 = dot(ab, ab); let t = L2 ? dot(sub(p, a), ab) / L2 : 0; t = Math.max(0, Math.min(1, t)); return dist(p, add(a, mul(ab, t))); }
+function dPrim(p, pr) {
+  if (pr.t === 'S') return dSeg(p, pr.a, pr.b);
+  if (pr.t === 'P') return dist(p, pr.p);
+  const t = ang(pr.c, p);
+  if (inSweep(t, pr.sa, pr.ea)) return Math.abs(dist(p, pr.c) - pr.r);
+  return Math.min(dist(p, polar(pr.c, pr.r, pr.sa)), dist(p, polar(pr.c, pr.r, pr.ea)));
+}
+function entDist(e, p, doc) {
+  if (e.type === 'HATCH' && pointInLoops(p, e.loops)) return 0;
+  if ((e.type === 'TEXT' || e.type === 'MTEXT')) { const ps = entPrims(e, doc).map(s => s.a); if (pointInPoly(p, ps)) return 0; }
+  let d = Infinity; for (const pr of entPrims(e, doc)) d = Math.min(d, dPrim(p, pr)); return d;
+}
+function pointInPoly(p, pts) { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const a = pts[i], b = pts[j]; if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; }
+function pointInLoops(p, loops) { let c = 0; for (const l of loops) if (pointInPoly(p, plPoints(l, true))) c++; return c % 2 === 1; }
+
+function ixSS(a, b, c, d, ext) {
+  const r = sub(b, a), s = sub(d, c), den = cross(r, s); if (Math.abs(den) < 1e-12) return [];
+  const t = cross(sub(c, a), s) / den, u = cross(sub(c, a), r) / den;
+  if (!ext && (t < -1e-9 || t > 1 + 1e-9 || u < -1e-9 || u > 1 + 1e-9)) return [];
+  return [add(a, mul(r, t))];
+}
+function ixLC(a, b, c, r, segOnly) {
+  const d = sub(b, a), f = sub(a, c), A = dot(d, d), B = 2 * dot(f, d), C = dot(f, f) - r * r; let disc = B * B - 4 * A * C;
+  if (disc < -1e-9 || A === 0) return []; disc = Math.sqrt(Math.max(0, disc));
+  const out = []; for (const t of disc < 1e-12 ? [-B / (2 * A)] : [(-B - disc) / (2 * A), (-B + disc) / (2 * A)]) if (!segOnly || (t >= -1e-9 && t <= 1 + 1e-9)) out.push(add(a, mul(d, t)));
+  return out;
+}
+function ixCC(c1, r1, c2, r2) {
+  const d = dist(c1, c2); if (d > r1 + r2 + 1e-9 || d < Math.abs(r1 - r2) - 1e-9 || d < 1e-12) return [];
+  const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, r1 * r1 - a * a));
+  const m = add(c1, mul(sub(c2, c1), a / d)), o = P(-(c2.y - c1.y) * h / d, (c2.x - c1.x) * h / d);
+  return h < 1e-12 ? [m] : [add(m, o), sub(m, o)];
+}
+function ixPrim(p, q) {
+  if (p.t === 'P' || q.t === 'P') return [];
+  if (p.t === 'S' && q.t === 'S') return ixSS(p.a, p.b, q.a, q.b);
+  if (p.t === 'A' && q.t === 'S') [p, q] = [q, p];
+  if (p.t === 'S') return ixLC(p.a, p.b, q.c, q.r, true).filter(x => inSweep(ang(q.c, x), q.sa, q.ea));
+  return ixCC(p.c, p.r, q.c, q.r).filter(x => inSweep(ang(p.c, x), p.sa, p.ea) && inSweep(ang(q.c, x), q.sa, q.ea));
+}
+function ixEnts(e1, e2, doc) {
+  const out = []; const A = entPrims(e1, doc).filter(p => !p.textbox), B = entPrims(e2, doc).filter(p => !p.textbox);
+  for (const p of A) for (const q of B) out.push(...ixPrim(p, q));
+  return out;
+}
+
+// ---------- transforms ----------
+function xform(e, m) {
+  const det = mDet(m), s = Math.sqrt(Math.abs(det)), rot = Math.atan2(m.b, m.a), mir = det < 0;
+  const T = p => tp(m, p);
+  switch (e.type) {
+    case 'LINE': e.a = T(e.a); e.b = T(e.b); break;
+    case 'XLINE': e.p = T(e.p); { const d = tv(m, e.dir), L = len(d) || 1; e.dir = P(d.x / L, d.y / L); } break;
+    case 'CIRCLE': e.c = T(e.c); e.r *= s; break;
+    case 'ARC': { const p0 = T(polar(e.c, e.r, e.sa)), p1 = T(polar(e.c, e.r, e.ea)); e.c = T(e.c); e.r *= s; let sa = ang(e.c, p0), ea = ang(e.c, p1); if (mir) [sa, ea] = [ea, sa]; e.sa = sa; e.ea = ea; break; }
+    case 'PLINE': e.v = e.v.map(v => Object.assign(T(v), { b: mir ? -(v.b || 0) : (v.b || 0) })); break;
+    case 'HATCH': e.loops = e.loops.map(l => l.map(v => Object.assign(T(v), { b: mir ? -(v.b || 0) : (v.b || 0) }))); break;
+    case 'ELLIPSE': e.c = T(e.c); e.maj = tv(m, e.maj); if (mir) { const sa = e.sa; e.sa = -e.ea; e.ea = -sa; } break;
+    case 'SPLINE': if (e.ctrl) e.ctrl = e.ctrl.map(T); if (e.fit) e.fit = e.fit.map(T); break;
+    case 'POINT': e.p = T(e.p); break;
+    case 'SOLID': e.pts = e.pts.map(T); break;
+    case 'TEXT': case 'MTEXT': e.p = T(e.p); if (e.p2) e.p2 = T(e.p2); e.h *= s; if (e.w) e.w *= s; if (!mir) e.rot = (e.rot || 0) + rot; else e.rot = (e.rot || 0) + rot + Math.PI - 2 * (e.rot || 0) - Math.PI; break;
+    case 'INSERT': e.p = T(e.p); e.sx *= s; e.sy *= s; if (mir) { e.sy = -e.sy; e.rot = -(e.rot || 0) + rot; } else e.rot = (e.rot || 0) + rot; break;
+    case 'DIM': e.p1 = T(e.p1); e.p2 = T(e.p2); e.dl = T(e.dl); if (e.mode !== 'A' && Math.abs(Math.sin(rot)) > 1e-6) e.mode = 'A'; e.ext = (e.ext || 1.25) * s; e.th = (e.th || 2.5) * s; e.ah = (e.ah || 2.5) * s; break;
+  }
+  invalidate(e); return e;
+}
+function cloneEnt(e) { const c = JSON.parse(JSON.stringify(e, (k, v) => k.startsWith('_') ? undefined : v)); c.id = _id++; return c; }
+
+// ---------- explode ----------
+function explodeEnt(e, doc) {
+  const L = e.layer, C = e.color;
+  if (e.type === 'PLINE') {
+    const n = e.v.length, out = [];
+    for (let i = 0; i < (e.closed ? n : n - 1); i++) {
+      const p = e.v[i], q = e.v[(i + 1) % n];
+      if (p.b && Math.abs(p.b) > 1e-9) { const a = bulgeArc(p, q, p.b); out.push(mk('ARC', { c: a.c, r: a.r, sa: a.sa, ea: a.ea }, L, C)); }
+      else out.push(mk('LINE', { a: P(p.x, p.y), b: P(q.x, q.y) }, L, C));
+    }
+    return out;
+  }
+  if (e.type === 'INSERT') {
+    const blk = doc.blocks.get(e.name); if (!blk) return null;
+    const m = insertM(e, blk);
+    return blk.ents.map(be => { const c = xform(cloneEnt(be), m); if (c.layer === '0') c.layer = L; if (c.color === 0) c.color = C; return c; });
+  }
+  if (e.type === 'DIM') {
+    const g = dimGeom(e); return [mk('LINE', { a: g.a, b: g.b }, L, C), mk('LINE', { a: g.e1[0], b: g.e1[1] }, L, C), mk('LINE', { a: g.e2[0], b: g.e2[1] }, L, C),
+    mk('TEXT', { p: add(mul(add(g.a, g.b), 0.5), mul(g.nrm, g.sgn * (e.th || 2.5) * 0.6)), h: e.th || 2.5, rot: Math.atan2(g.dir.y, g.dir.x), text: dimText(e), ha: 1, va: 1, p2: add(mul(add(g.a, g.b), 0.5), mul(g.nrm, g.sgn * (e.th || 2.5) * 0.6)) }, L, C)];
+  }
+  if (e.type === 'MTEXT') return textLines(e).map((t, i) => mk('TEXT', { p: tp(mMul(mTrans(e.p.x, e.p.y), mRot(e.rot || 0)), P(textBox(e)[0], textBox(e)[3] - e.h * (1 + i * 1.66))), h: e.h, rot: e.rot || 0, text: t }, L, C));
+  return null;
+}
+function dimText(e) { if (e.text) return e.text; const v = dimGeom(e).value; return fmtNum(v, e.prec == null ? 2 : e.prec); }
+function fmtNum(v, prec) { const s = v.toFixed(prec); return prec > 0 ? s.replace(/\.?0+$/, '') || '0' : s; }
+
+// ---------- DXF parser ----------
+function parseDXF(text) {
+  const lines = text.split(/\r\n|\r|\n/), pairs = [];
+  for (let i = 0; i + 1 < lines.length; i += 2) { const c = parseInt(lines[i], 10); if (isNaN(c)) { i--; continue; } pairs.push([c, c === 1 || c === 3 ? lines[i + 1].replace(/\s+$/, '') : lines[i + 1].trim()]); }
+  const doc = newDoc(); doc.layers.clear();
+  let i = 0, section = null;
+  const warnings = new Set();
+  const readEntity = () => { const codes = [pairs[i]]; i++; while (i < pairs.length && pairs[i][0] !== 0) { codes.push(pairs[i]); i++; } return codes; };
+  const readEntities = (target, stopTag) => {
+    while (i < pairs.length) {
+      const [c, v] = pairs[i];
+      if (c !== 0) { i++; continue; }
+      if (v === stopTag || v === 'ENDSEC') return;
+      const codes = readEntity();
+      if (v === 'POLYLINE') {
+        const verts = [];
+        while (i < pairs.length && pairs[i][1] === 'VERTEX') verts.push(readEntity());
+        if (i < pairs.length && pairs[i][1] === 'SEQEND') readEntity();
+        const e = buildPolyline(codes, verts); if (e) target.push(e);
+      } else if (v === 'INSERT') {
+        const e = buildEnt('INSERT', codes, warnings); if (e) target.push(e);
+        if (g(codes, 66) == 1) {
+          while (i < pairs.length && pairs[i][1] === 'ATTRIB') { const ac = readEntity(); const t = buildEnt('TEXT', ac, warnings); if (t && !(+g(ac, 70) & 1)) target.push(t); }
+          if (i < pairs.length && pairs[i][1] === 'SEQEND') readEntity();
+        }
+      } else { const e = buildEnt(v, codes, warnings); if (e) target.push(e); }
+    }
+  };
+  while (i < pairs.length) {
+    const [c, v] = pairs[i];
+    if (c === 0 && v === 'SECTION') { i++; section = pairs[i] && pairs[i][1]; i++; continue; }
+    if (c === 0 && v === 'ENDSEC') { section = null; i++; continue; }
+    if (section === 'HEADER') {
+      if (c === 9 && v === '$INSUNITS') { doc.units = +pairs[i + 1][1]; i += 2; continue; }
+      if (c === 9 && v === '$CLAYER') { doc.clayer = pairs[i + 1][1]; i += 2; continue; }
+      i++; continue;
+    }
+    if (section === 'TABLES') {
+      if (c === 0 && v === 'LAYER') {
+        const codes = readEntity();
+        const name = g(codes, 2); if (name == null) continue;
+        const col = +(g(codes, 62) ?? 7), fl = +(g(codes, 70) ?? 0);
+        doc.layers.set(name, { name, color: Math.abs(col) || 7, on: col >= 0 && !(fl & 1), locked: !!(fl & 4), lt: (g(codes, 6) || 'CONTINUOUS').toUpperCase(), rgb: g(codes, 420) != null ? +g(codes, 420) : undefined });
+        continue;
+      }
+      i++; continue;
+    }
+    if (section === 'BLOCKS') {
+      if (c === 0 && v === 'BLOCK') {
+        const codes = readEntity(); const name = g(codes, 2); const ents = [];
+        readEntities(ents, 'ENDBLK'); if (i < pairs.length && pairs[i][1] === 'ENDBLK') readEntity();
+        if (name && !/^\*(model|paper)_space/i.test(name)) doc.blocks.set(name, { name, base: P(+g(codes, 10) || 0, +g(codes, 20) || 0), ents });
+        continue;
+      }
+      i++; continue;
+    }
+    if (section === 'ENTITIES') { readEntities(doc.ents, '__none__'); continue; }
+    i++;
+  }
+  if (!doc.layers.has('0')) doc.layers.set('0', { name: '0', color: 7, on: true, locked: false, lt: 'CONTINUOUS' });
+  for (const e of [...doc.ents, ...[...doc.blocks.values()].flatMap(b => b.ents)]) if (!doc.layers.has(e.layer)) doc.layers.set(e.layer, { name: e.layer, color: 7, on: true, locked: false, lt: 'CONTINUOUS' });
+  if (!doc.layers.has(doc.clayer)) doc.clayer = '0';
+  doc.warnings = [...warnings];
+  return doc;
+}
+function g(codes, c) { for (const p of codes) if (p[0] === c) return p[1]; return undefined; }
+function ga(codes, c) { return codes.filter(p => p[0] === c).map(p => p[1]); }
+function num(codes, c, d) { const v = g(codes, c); return v == null ? d : +v; }
+function pt(codes, cx) { return P(num(codes, cx, 0), num(codes, cx + 10, 0)); }
+function common(codes) { const o = { layer: g(codes, 8) || '0', color: num(codes, 62, 256) }; const lt = g(codes, 6); if (lt && !/^bylayer$/i.test(lt)) o.lt = lt.toUpperCase(); const tc = g(codes, 420); if (tc != null) o.rgb = +tc; if (num(codes, 60, 0) === 1) o.hidden = true; return o; }
+function buildPolyline(codes, verts) {
+  const fl = num(codes, 70, 0); if (fl & (16 | 64)) return null; // mesh / polyface
+  const v = verts.filter(vc => !(num(vc, 70, 0) & 16)).map(vc => ({ x: num(vc, 10, 0), y: num(vc, 20, 0), b: num(vc, 42, 0) }));
+  if (v.length < 2) return null;
+  const cm = common(codes); return Object.assign(mk('PLINE', { v, closed: !!(fl & 1) }, cm.layer, cm.color), cm);
+}
+function buildEnt(type, codes, warnings) {
+  const cm = common(codes); if (cm.hidden) return null;
+  const E = (t, props) => Object.assign(mk(t, props, cm.layer, cm.color), cm);
+  switch (type) {
+    case 'LINE': return E('LINE', { a: pt(codes, 10), b: pt(codes, 11) });
+    case 'XLINE': case 'RAY': return E('XLINE', { p: pt(codes, 10), dir: pt(codes, 11), ray: type === 'RAY' });
+    case 'CIRCLE': return E('CIRCLE', { c: pt(codes, 10), r: num(codes, 40, 1) });
+    case 'ARC': return E('ARC', { c: pt(codes, 10), r: num(codes, 40, 1), sa: num(codes, 50, 0) * D2R, ea: num(codes, 51, 360) * D2R });
+    case 'POINT': return E('POINT', { p: pt(codes, 10) });
+    case 'LWPOLYLINE': {
+      const v = []; for (const [c, val] of codes) { if (c === 10) v.push({ x: +val, y: 0, b: 0 }); else if (c === 20 && v.length) v[v.length - 1].y = +val; else if (c === 42 && v.length) v[v.length - 1].b = +val; }
+      return v.length >= 2 ? E('PLINE', { v, closed: !!(num(codes, 70, 0) & 1) }) : null;
+    }
+    case 'ELLIPSE': return E('ELLIPSE', { c: pt(codes, 10), maj: pt(codes, 11), ratio: num(codes, 40, 1), sa: num(codes, 41, 0), ea: num(codes, 42, TAU) });
+    case 'SPLINE': {
+      const ctrl = [], fit = []; for (const [c, val] of codes) { if (c === 10) ctrl.push(P(+val, 0)); else if (c === 20) ctrl[ctrl.length - 1].y = +val; else if (c === 11) fit.push(P(+val, 0)); else if (c === 21) fit[fit.length - 1].y = +val; }
+      return E('SPLINE', { deg: num(codes, 71, 3), knots: ga(codes, 40).map(Number), w: ga(codes, 41).map(Number), ctrl, fit, closed: !!(num(codes, 70, 0) & 1) });
+    }
+    case 'TEXT': case 'ATTRIB': case 'ATTDEF': {
+      if (type === 'ATTDEF') return null;
+      return E('TEXT', { p: pt(codes, 10), p2: g(codes, 11) != null ? pt(codes, 11) : null, h: num(codes, 40, 2.5), rot: num(codes, 50, 0) * D2R, text: g(codes, 1) || '', ha: num(codes, 72, 0), va: num(codes, type === 'TEXT' ? 73 : 74, 0) });
+    }
+    case 'MTEXT': {
+      let rot = num(codes, 50, null); if (rot == null && g(codes, 11) != null) rot = Math.atan2(num(codes, 21, 0), num(codes, 11, 1)); else rot = (rot || 0) * D2R;
+      return E('MTEXT', { p: pt(codes, 10), h: num(codes, 40, 2.5), w: num(codes, 41, 0), attach: num(codes, 71, 1), rot, text: ga(codes, 3).join('') + (g(codes, 1) || '') });
+    }
+    case 'INSERT': return E('INSERT', { name: g(codes, 2), p: pt(codes, 10), sx: num(codes, 41, 1), sy: num(codes, 42, num(codes, 41, 1)), rot: num(codes, 50, 0) * D2R });
+    case 'DIMENSION': { const name = g(codes, 2); return name ? E('INSERT', { name, p: P(0, 0), sx: 1, sy: 1, rot: 0, dimblk: true }) : null; }
+    case 'SOLID': case 'TRACE': case '3DFACE': {
+      const c = [pt(codes, 10), pt(codes, 11), pt(codes, 12), pt(codes, 13)];
+      const pts = type === '3DFACE' ? c : [c[0], c[1], c[3], c[2]];
+      return E('SOLID', { pts: pts.filter((p, k) => k === 0 || dist(p, pts[k - 1]) > 1e-12), fill: type !== '3DFACE' });
+    }
+    case 'LEADER': { const v = []; for (const [c, val] of codes) { if (c === 10) v.push({ x: +val, y: 0, b: 0 }); else if (c === 20 && v.length) v[v.length - 1].y = +val; } return v.length >= 2 ? E('PLINE', { v, closed: false }) : null; }
+    case 'HATCH': return buildHatch(codes, E);
+    case 'VIEWPORT': case 'SEQEND': case 'ENDBLK': return null;
+    default: if (warnings) warnings.add(type); return null;
+  }
+}
+function buildHatch(codes, E) {
+  let k = codes.findIndex(p => p[0] === 91); if (k < 0) return null;
+  const nPaths = +codes[k][1]; k++;
+  const loops = [];
+  const next = (c) => { while (k < codes.length && codes[k][0] !== c) k++; return k < codes.length ? +codes[k++][1] : 0; };
+  for (let pI = 0; pI < nPaths; pI++) {
+    const flag = next(92); const v = [];
+    if (flag & 2) {
+      const hasB = next(72); next(73); const n = next(93);
+      for (let j = 0; j < n; j++) { const x = next(10), y = next(20); let b = 0; if (hasB && codes[k] && codes[k][0] === 42) b = +codes[k++][1]; v.push({ x, y, b }); }
+    } else {
+      const ne = next(93);
+      for (let j = 0; j < ne; j++) {
+        const et = next(72);
+        if (et === 1) { const a = P(next(10), next(20)), b = P(next(11), next(21)); v.push({ x: a.x, y: a.y, b: 0 }); if (j === ne - 1) { } }
+        else if (et === 2) { const c = P(next(10), next(20)), r = next(40); let sa = next(50) * D2R, ea = next(51) * D2R; const ccw = next(73); if (!ccw) { sa = -sa; ea = -ea; } const p0 = polar(c, r, sa); v.push({ x: p0.x, y: p0.y, b: ccw ? arcBulge(sa, ea, true) : -arcBulge(ea, sa, true) }); }
+        else if (et === 3) { const c = P(next(10), next(20)), mj = P(next(11), next(21)), ratio = next(40); let sa = next(50) * D2R, ea = next(51) * D2R; const ccw = next(73); const el = { c, maj: mj, ratio, sa: ccw ? sa : -ea, ea: ccw ? ea : -sa }; let pts = tessEllipse(el); if (!ccw) pts.reverse(); pts.slice(0, -1).forEach(p => v.push({ x: p.x, y: p.y, b: 0 })); }
+        else if (et === 4) { const deg = next(94); next(73); next(74); const nk = next(95), nc = next(96); const knots = []; for (let q = 0; q < nk; q++) knots.push(next(40)); const ctrl = []; for (let q = 0; q < nc; q++) ctrl.push(P(next(10), next(20))); tessSpline({ deg, knots, ctrl }).slice(0, -1).forEach(p => v.push({ x: p.x, y: p.y, b: 0 })); }
+      }
+    }
+    if (v.length >= 2) loops.push(v);
+  }
+  if (!loops.length) return null;
+  return E('HATCH', { loops, solid: num(codes, 70, 0) === 1, pattern: g(codes, 2) || 'SOLID' });
+}
+
+// ---------- DWG (libredwg-web db) → doc ----------
+function dwgToDoc(db) {
+  const doc = newDoc(); doc.layers.clear(); const warnings = new Set();
+  for (const L of (db.tables.LAYER && db.tables.LAYER.entries) || []) {
+    const col = L.colorIndex == null || L.colorIndex === 256 ? 7 : L.colorIndex;
+    doc.layers.set(L.name, { name: L.name, color: Math.abs(col) || 7, on: !L.off && !L.frozen && col >= 0, locked: !!L.locked, lt: (L.lineType || 'CONTINUOUS').toUpperCase() });
+  }
+  if (!doc.layers.has('0')) doc.layers.set('0', { name: '0', color: 7, on: true, locked: false, lt: 'CONTINUOUS' });
+  const p2 = o => P(o ? o.x || 0 : 0, o ? o.y || 0 : 0);
+  const conv = (s) => {
+    const cm = { layer: s.layer || '0', color: s.colorIndex == null ? 256 : s.colorIndex };
+    if (s.lineType && !/^bylayer$/i.test(s.lineType)) cm.lt = s.lineType.toUpperCase();
+    if (s.isVisible === false) return null;
+    const E = (t, pr) => Object.assign(mk(t, pr, cm.layer, cm.color), cm.lt ? { lt: cm.lt } : {});
+    const vtx = vs => (vs || []).map(v => ({ x: v.x || 0, y: v.y || 0, b: v.bulge || 0 }));
+    switch (s.type) {
+      case 'LINE': return E('LINE', { a: p2(s.startPoint), b: p2(s.endPoint) });
+      case 'XLINE': case 'RAY': return E('XLINE', { p: p2(s.firstPoint), dir: p2(s.unitDirection), ray: s.type === 'RAY' });
+      case 'CIRCLE': return E('CIRCLE', { c: p2(s.center), r: s.radius });
+      case 'ARC': return E('ARC', { c: p2(s.center), r: s.radius, sa: s.startAngle, ea: s.endAngle });
+      case 'POINT': return E('POINT', { p: p2(s.position) });
+      case 'LWPOLYLINE': case 'POLYLINE2D': case 'POLYLINE3D': { const v = vtx(s.vertices); return v.length >= 2 ? E('PLINE', { v, closed: !!(s.flag & 1) || !!(s.flag & 512) }) : null; }
+      case 'ELLIPSE': return E('ELLIPSE', { c: p2(s.center), maj: p2(s.majorAxisEndPoint), ratio: s.axisRatio, sa: s.startAngle || 0, ea: s.endAngle == null ? TAU : s.endAngle });
+      case 'SPLINE': return E('SPLINE', { deg: s.degree || 3, knots: s.knots || [], w: s.weights || [], ctrl: (s.controlPoints || []).map(p2), fit: (s.fitPoints || []).map(p2), closed: !!(s.flag & 1) });
+      case 'TEXT': case 'ATTRIB': return E('TEXT', { p: p2(s.startPoint), p2: s.endPoint ? p2(s.endPoint) : null, h: s.textHeight || 2.5, rot: s.rotation || 0, text: s.text || '', ha: s.halign || 0, va: s.valign || 0 });
+      case 'MTEXT': { let rot = s.rotation || 0; if (!rot && s.direction && (s.direction.x || s.direction.y)) rot = Math.atan2(s.direction.y, s.direction.x); return E('MTEXT', { p: p2(s.insertionPoint), h: s.textHeight || 2.5, w: s.rectWidth || 0, attach: s.attachmentPoint || 1, rot, text: s.text || '' }); }
+      case 'INSERT': return E('INSERT', { name: s.name, p: p2(s.insertionPoint), sx: s.xScale || 1, sy: s.yScale || 1, rot: s.rotation || 0 });
+      case 'DIMENSION': return s.name ? E('INSERT', { name: s.name, p: P(0, 0), sx: 1, sy: 1, rot: 0, dimblk: true }) : null;
+      case 'SOLID': case 'TRACE': case '3DFACE': { const c = [p2(s.corner1), p2(s.corner2), p2(s.corner3), p2(s.corner4 || s.corner3)]; const pts = s.type === '3DFACE' ? c : [c[0], c[1], c[3], c[2]]; return E('SOLID', { pts: pts.filter((p, k) => k === 0 || dist(p, pts[k - 1]) > 1e-12), fill: s.type !== '3DFACE' }); }
+      case 'HATCH': {
+        const loops = [];
+        for (const bp of s.boundaryPaths || []) {
+          const v = [];
+          if (bp.vertices && bp.vertices.length) v.push(...vtx(bp.vertices));
+          else for (const ed of bp.edges || []) {
+            if (ed.type === 1) v.push({ x: ed.start.x, y: ed.start.y, b: 0 });
+            else if (ed.type === 2) { const c = p2(ed.center); let sa = ed.startAngle || 0, ea = ed.endAngle || 0; const ccw = ed.isCCW !== false && ed.isCCW !== 0; if (!ccw) { sa = -sa; ea = -ea; } const p0 = polar(c, ed.radius, sa); v.push({ x: p0.x, y: p0.y, b: ccw ? arcBulge(sa, ea, true) : -arcBulge(ea, sa, true) }); }
+            else if (ed.type === 3) { const el = { c: p2(ed.center), maj: p2(ed.end || ed.majorAxisEndPoint), ratio: ed.lengthOfMinorAxis || ed.axisRatio || 1, sa: ed.startAngle || 0, ea: ed.endAngle || TAU }; tessEllipse(el).slice(0, -1).forEach(p => v.push({ x: p.x, y: p.y, b: 0 })); }
+            else if (ed.type === 4) { tessSpline({ deg: ed.degree || 3, knots: ed.knots || [], ctrl: (ed.controlPoints || []).map(p2), fit: (ed.fitDatum || ed.fitPoints || []).map(p2) }).slice(0, -1).forEach(p => v.push({ x: p.x, y: p.y, b: 0 })); }
+          }
+          if (v.length >= 2) loops.push(v);
+        }
+        return loops.length ? E('HATCH', { loops, solid: !!s.solidFill, pattern: s.patternName || 'SOLID' }) : null;
+      }
+      case 'LEADER': { const v = vtx(s.vertices); return v.length >= 2 ? E('PLINE', { v, closed: false }) : null; }
+      case 'VIEWPORT': case 'ATTDEF': return null;
+      default: warnings.add(s.type); return null;
+    }
+  };
+  const recs = (db.tables.BLOCK_RECORD && db.tables.BLOCK_RECORD.entries) || [];
+  for (const b of recs) {
+    if (/^\*paper_space/i.test(b.name)) continue;
+    const ents = (b.entities || []).map(conv).filter(Boolean);
+    if (/^\*model_space/i.test(b.name)) { doc.ents.push(...ents); continue; }
+    doc.blocks.set(b.name, { name: b.name, base: p2(b.basePoint), ents: ents.filter(e => !(e.type === 'INSERT' && e.name === b.name)) });
+  }
+  if (!recs.some(b => /^\*model_space/i.test(b.name))) doc.ents.push(...(db.entities || []).map(conv).filter(Boolean));
+  for (const e of [...doc.ents, ...[...doc.blocks.values()].flatMap(b => b.ents)]) if (!doc.layers.has(e.layer)) doc.layers.set(e.layer, { name: e.layer, color: 7, on: true, locked: false, lt: 'CONTINUOUS' });
+  const cl = db.header && db.header.CLAYER; if (cl && doc.layers.has(cl)) doc.clayer = cl;
+  if (db.header && db.header.INSUNITS != null) doc.units = db.header.INSUNITS;
+  doc.warnings = [...warnings];
+  return doc;
+}
+
+// ---------- DXF writer (R12 / AC1009 — opens in every CAD program) ----------
+const LT_DEFS = {
+  CONTINUOUS: ['Solid line', []], DASHED: ['Dashed __ __ __', [12.7, -6.35]], HIDDEN: ['Hidden _ _ _', [6.35, -3.175]],
+  CENTER: ['Center ____ _ ____', [31.75, -6.35, 6.35, -6.35]], PHANTOM: ['Phantom ____ _ _ ____', [31.75, -6.35, 6.35, -6.35, 6.35, -6.35]], DOT: ['Dot . . .', [0, -6.35]],
+};
+function ltPattern(name) { const n = (name || '').toUpperCase(); for (const k of Object.keys(LT_DEFS)) if (n.startsWith(k)) return k; return null; }
+function writeDXF(doc) {
+  const o = []; const w = (c, v) => { o.push(String(c)); o.push(typeof v === 'number' ? (Number.isInteger(v) ? String(v) : v.toFixed(10).replace(/0+$/, '').replace(/\.$/, '.0')) : String(v)); };
+  const bb = docBB(doc);
+  w(0, 'SECTION'); w(2, 'HEADER');
+  w(9, '$ACADVER'); w(1, 'AC1009');
+  w(9, '$INSBASE'); w(10, 0); w(20, 0); w(30, 0);
+  if (isFinite(bb[0])) { w(9, '$EXTMIN'); w(10, bb[0]); w(20, bb[1]); w(30, 0); w(9, '$EXTMAX'); w(10, bb[2]); w(20, bb[3]); w(30, 0); }
+  w(9, '$CLAYER'); w(8, doc.clayer || '0');
+  w(9, '$INSUNITS'); w(70, doc.units || 0);
+  w(0, 'ENDSEC');
+  // tables
+  w(0, 'SECTION'); w(2, 'TABLES');
+  const used = new Set(['CONTINUOUS']);
+  const scan = e => { const k = ltPattern(e.lt); if (k) used.add(k); };
+  doc.ents.forEach(scan); doc.blocks.forEach(b => b.ents.forEach(scan)); doc.layers.forEach(l => { const k = ltPattern(l.lt); if (k) used.add(k); });
+  w(0, 'TABLE'); w(2, 'LTYPE'); w(70, used.size);
+  for (const k of used) { const [desc, pat] = LT_DEFS[k]; w(0, 'LTYPE'); w(2, k); w(70, 0); w(3, desc); w(72, 65); w(73, pat.length); w(40, pat.reduce((s, x) => s + Math.abs(x), 0)); pat.forEach(x => w(49, x)); }
+  w(0, 'ENDTAB');
+  w(0, 'TABLE'); w(2, 'LAYER'); w(70, doc.layers.size);
+  for (const L of doc.layers.values()) { w(0, 'LAYER'); w(2, L.name); w(70, L.locked ? 4 : 0); w(62, (L.on ? 1 : -1) * (L.color || 7)); w(6, ltPattern(L.lt) || 'CONTINUOUS'); }
+  w(0, 'ENDTAB');
+  w(0, 'TABLE'); w(2, 'STYLE'); w(70, 1); w(0, 'STYLE'); w(2, 'STANDARD'); w(70, 0); w(40, 0); w(41, 1); w(50, 0); w(71, 0); w(42, 2.5); w(3, 'txt'); w(4, ''); w(0, 'ENDTAB');
+  w(0, 'ENDSEC');
+  // blocks
+  w(0, 'SECTION'); w(2, 'BLOCKS');
+  for (const b of doc.blocks.values()) {
+    w(0, 'BLOCK'); w(8, '0'); w(2, b.name); w(70, b.name.startsWith('*') ? 1 : 0); w(10, b.base.x); w(20, b.base.y); w(30, 0); w(3, b.name);
+    for (const e of b.ents) writeEnt(e, w);
+    w(0, 'ENDBLK'); w(8, '0');
+  }
+  w(0, 'ENDSEC');
+  w(0, 'SECTION'); w(2, 'ENTITIES');
+  for (const e of doc.ents) writeEnt(e, w);
+  w(0, 'ENDSEC'); w(0, 'EOF');
+  return o.join('\r\n') + '\r\n';
+}
+function writeEnt(e, w) {
+  const head = (t) => { w(0, t); w(8, e.layer || '0'); const k = ltPattern(e.lt); if (k && k !== 'CONTINUOUS') w(6, k); if (e.color != null && e.color !== 256) w(62, e.color); };
+  const pl = (pts, closed, bul) => { head('POLYLINE'); w(66, 1); w(70, closed ? 1 : 0); w(10, 0); w(20, 0); w(30, 0); for (const p of pts) { w(0, 'VERTEX'); w(8, e.layer || '0'); w(10, p.x); w(20, p.y); w(30, 0); if (bul && p.b) w(42, p.b); } w(0, 'SEQEND'); w(8, e.layer || '0'); };
+  switch (e.type) {
+    case 'LINE': head('LINE'); w(10, e.a.x); w(20, e.a.y); w(30, 0); w(11, e.b.x); w(21, e.b.y); w(31, 0); break;
+    case 'XLINE': { const L = 1e5; const a = e.ray ? e.p : add(e.p, mul(e.dir, -L)), b = add(e.p, mul(e.dir, L)); head('LINE'); w(10, a.x); w(20, a.y); w(30, 0); w(11, b.x); w(21, b.y); w(31, 0); break; }
+    case 'CIRCLE': head('CIRCLE'); w(10, e.c.x); w(20, e.c.y); w(30, 0); w(40, e.r); break;
+    case 'ARC': head('ARC'); w(10, e.c.x); w(20, e.c.y); w(30, 0); w(40, e.r); w(50, normA(e.sa) * R2D); w(51, normA(e.ea) * R2D); break;
+    case 'POINT': head('POINT'); w(10, e.p.x); w(20, e.p.y); w(30, 0); break;
+    case 'PLINE': pl(e.v, e.closed, true); break;
+    case 'ELLIPSE': pl(tessEllipse(e), normA(e.ea - e.sa) < 1e-9); break;
+    case 'SPLINE': pl(tessSpline(e), e.closed); break;
+    case 'HATCH': for (const l of e.loops) pl(l, true, true); if (e.solid) { /* boundary only in R12 */ } break;
+    case 'SOLID': { head(e.fill ? 'SOLID' : '3DFACE'); const p = e.fill ? [e.pts[0], e.pts[1], e.pts[3] || e.pts[2], e.pts[2]] : [e.pts[0], e.pts[1], e.pts[2], e.pts[3] || e.pts[2]]; p.forEach((q, k) => { w(10 + k, q.x); w(20 + k, q.y); w(30 + k, 0); }); break; }
+    case 'TEXT': { head('TEXT'); w(10, e.p.x); w(20, e.p.y); w(30, 0); w(40, e.h); w(1, e.text); if (e.rot) w(50, e.rot * R2D); if (e.ha || e.va) { w(72, e.ha || 0); const q = e.p2 || e.p; w(11, q.x); w(21, q.y); w(31, 0); w(73, e.va || 0); } break; }
+    case 'MTEXT': { const parts = explodeEnt(e); parts.forEach(t => writeEnt(t, w)); break; }
+    case 'INSERT': head('INSERT'); w(2, e.name); w(10, e.p.x); w(20, e.p.y); w(30, 0); if (e.sx !== 1) w(41, e.sx); if (e.sy !== 1) w(42, e.sy); if (e.rot) w(50, e.rot * R2D); break;
+    case 'DIM': {
+      const g = dimGeom(e), ah = e.ah || 2.5;
+      const L = (a, b) => { head('LINE'); w(10, a.x); w(20, a.y); w(30, 0); w(11, b.x); w(21, b.y); w(31, 0); };
+      L(g.a, g.b); L(g.e1[0], g.e1[1]); L(g.e2[0], g.e2[1]);
+      for (const [p, d] of [[g.a, g.dir], [g.b, mul(g.dir, -1)]]) { const n = P(-d.y, d.x); const q1 = add(add(p, mul(d, ah)), mul(n, ah / 6)), q2 = add(add(p, mul(d, ah)), mul(n, -ah / 6)); head('SOLID'); [p, q1, q2, q2].forEach((q, k) => { w(10 + k, q.x); w(20 + k, q.y); w(30 + k, 0); }); }
+      const t = explodeEnt(e)[3]; writeEnt(t, w); break;
+    }
+  }
+}
+
+// ---------- sample drawing ----------
+function sampleDoc() {
+  const d = newDoc(); d.name = 'Example – mounting plate';
+  d.layers.set('OUTLINE', { name: 'OUTLINE', color: 7, on: true, locked: false, lt: 'CONTINUOUS' });
+  d.layers.set('HOLES', { name: 'HOLES', color: 4, on: true, locked: false, lt: 'CONTINUOUS' });
+  d.layers.set('CENTER', { name: 'CENTER', color: 1, on: true, locked: false, lt: 'CENTER' });
+  d.layers.set('DIMS', { name: 'DIMS', color: 3, on: true, locked: false, lt: 'CONTINUOUS' });
+  d.layers.set('TITLE', { name: 'TITLE', color: 8, on: true, locked: false, lt: 'CONTINUOUS' });
+  const r = 6, W = 160, H = 100;
+  d.ents.push(mk('PLINE', { closed: true, v: [{ x: r, y: 0, b: 0 }, { x: W - r, y: 0, b: Math.tan(Math.PI / 8) }, { x: W, y: r, b: 0 }, { x: W, y: H - r, b: Math.tan(Math.PI / 8) }, { x: W - r, y: H, b: 0 }, { x: r, y: H, b: Math.tan(Math.PI / 8) }, { x: 0, y: H - r, b: 0 }, { x: 0, y: r, b: Math.tan(Math.PI / 8) }] }, 'OUTLINE'));
+  for (const [x, y] of [[15, 15], [W - 15, 15], [W - 15, H - 15], [15, H - 15]]) {
+    d.ents.push(mk('CIRCLE', { c: P(x, y), r: 4.5 }, 'HOLES'));
+    d.ents.push(mk('LINE', { a: P(x - 8, y), b: P(x + 8, y) }, 'CENTER'), mk('LINE', { a: P(x, y - 8), b: P(x, y + 8) }, 'CENTER'));
+  }
+  d.ents.push(mk('CIRCLE', { c: P(80, 50), r: 22 }, 'HOLES'), mk('CIRCLE', { c: P(80, 50), r: 30 }, 'CENTER'));
+  for (let k = 0; k < 6; k++) d.ents.push(mk('CIRCLE', { c: polar(P(80, 50), 30, k * Math.PI / 3), r: 2.75 }, 'HOLES'));
+  d.ents.push(mk('LINE', { a: P(46, 50), b: P(114, 50) }, 'CENTER'), mk('LINE', { a: P(80, 16), b: P(80, 84) }, 'CENTER'));
+  d.ents.push(mk('ARC', { c: P(80, 50), r: 40, sa: 200 * D2R, ea: 340 * D2R }, 'OUTLINE'));
+  d.ents.push(mk('DIM', { p1: P(0, 0), p2: P(W, 0), dl: P(0, -14), mode: 'H', th: 3.5, ah: 3, ext: 1.5 }, 'DIMS'));
+  d.ents.push(mk('DIM', { p1: P(W, 0), p2: P(W, H), dl: P(W + 14, 0), mode: 'V', th: 3.5, ah: 3, ext: 1.5 }, 'DIMS'));
+  d.ents.push(mk('DIM', { p1: P(15, H - 15), p2: P(W - 15, H - 15), dl: P(0, H + 10), mode: 'H', th: 3.5, ah: 3, ext: 1.5 }, 'DIMS'));
+  d.ents.push(mk('MTEXT', { p: P(0, -28), h: 3.5, w: 120, attach: 1, rot: 0, text: '4X %%c9 THRU, 6X %%c5.5 ON %%c60 BC\\PBREAK ALL EDGES 0.5 MAX' }, 'DIMS'));
+  // title block as a block definition
+  d.blocks.set('TITLEBLOCK', { name: 'TITLEBLOCK', base: P(0, 0), ents: [
+    mk('PLINE', { closed: true, v: [{ x: 0, y: 0 }, { x: 90, y: 0 }, { x: 90, y: 28 }, { x: 0, y: 28 }].map(p => ({ ...p, b: 0 })) }, '0'),
+    mk('LINE', { a: P(0, 14), b: P(90, 14) }, '0'), mk('LINE', { a: P(55, 0), b: P(55, 14) }, '0'),
+    mk('TEXT', { p: P(3, 18), h: 5, rot: 0, text: 'MOUNTING PLATE' }, '0'),
+    mk('TEXT', { p: P(3, 5), h: 3, rot: 0, text: 'EXAMPLE DRAWING' }, '0'),
+    mk('TEXT', { p: P(58, 5), h: 3, rot: 0, text: 'SCALE 1:1' }, '0')] });
+  d.ents.push(mk('INSERT', { name: 'TITLEBLOCK', p: P(W + 30, -40), sx: 1, sy: 1, rot: 0 }, 'TITLE'));
+  d.units = 4; d.clayer = 'OUTLINE';
+  return d;
+}
+
+if (typeof module !== 'undefined') module.exports = { parseDXF, writeDXF, dwgToDoc, sampleDoc, docBB, entPrims, ixEnts, explodeEnt, xform, mRot, mMirror, P, dimGeom, tessSpline };
+
+</script>
+<script>
+// ===== DraftBench UI =====
+const $ = s => document.querySelector(s);
+const cv = $('#cv'), ctx = cv.getContext('2d');
+let doc = sampleDoc(), docIsExample = true;
+let sel = new Set();
+const view = { s: 4, tx: 0, ty: 0, w: 0, h: 0, dpr: 1 };
+const st = { grid: true, snap: false, ortho: false, osnap: true, snapUnit: 1, dimTxt: 3.5, textH: 3.5, filletR: 0, offsetD: 10, color: 256, lt: null };
+let mouse = { sx: 0, sy: 0, w: P(0, 0), in: false };
+let hover = null, snapHit = null, boxSel = null, panDrag = null, panMode = false;
+let req = null, running = null, lastCmd = null, lastPt = null;
+let undoStack = [], redoStack = [];
+
+// ---------- theme ----------
+let TH = {};
+function readTheme() { if (darkCache) for (const k in darkCache) delete darkCache[k]; const cs = getComputedStyle(document.documentElement); for (const k of ['--canvas', '--canvas-grid', '--canvas-grid-major', '--ink', '--sel', '--hover', '--snap', '--grip', '--box-win', '--box-cross']) TH[k] = cs.getPropertyValue(k).trim(); }
+readTheme();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readTheme(); draw(); });
+new MutationObserver(() => { readTheme(); draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ---------- view ----------
+const w2s = p => P(p.x * view.s + view.tx, -p.y * view.s + view.ty);
+const s2w = (x, y) => P((x - view.tx) / view.s, (view.ty - y) / view.s);
+function resize() {
+  const r = cv.parentElement.getBoundingClientRect(); view.dpr = window.devicePixelRatio || 1;
+  const cx = view.w ? s2w(view.w / 2, view.h / 2) : null;
+  view.w = r.width; view.h = r.height; cv.width = Math.round(r.width * view.dpr); cv.height = Math.round(r.height * view.dpr);
+  if (cx) { view.tx = view.w / 2 - cx.x * view.s; view.ty = view.h / 2 + cx.y * view.s; }
+  draw();
+}
+function zoomBB(bb, margin = 0.08) {
+  if (!isFinite(bb[0])) { view.s = 4; view.tx = view.w / 2; view.ty = view.h / 2; return; }
+  const W = Math.max(bb[2] - bb[0], 1e-6), H = Math.max(bb[3] - bb[1], 1e-6);
+  view.s = Math.min(view.w * (1 - 2 * margin) / W, view.h * (1 - 2 * margin) / H);
+  view.tx = view.w / 2 - (bb[0] + W / 2) * view.s; view.ty = view.h / 2 + (bb[1] + H / 2) * view.s;
+}
+function robustBB() {
+  const bbs = doc.ents.filter(e => layerVisible(e.layer) && e.type !== 'XLINE').map(e => entBB(e, doc)).filter(b => isFinite(b[0]));
+  if (bbs.length < 8) return docBB(doc, doc.ents.filter(e => e.type !== 'XLINE'));
+  const q = (arr, t) => { const a = arr.slice().sort((x, y) => x - y); return a[Math.floor(t * (a.length - 1))]; };
+  const cx = bbs.map(b => (b[0] + b[2]) / 2), cy = bbs.map(b => (b[1] + b[3]) / 2);
+  const x0 = q(cx, .05), x1 = q(cx, .95), y0 = q(cy, .05), y1 = q(cy, .95), span = Math.max(x1 - x0, y1 - y0, 1e-9) * 3;
+  const keep = bbs.filter(b => b[0] > x0 - span && b[2] < x1 + span && b[1] > y0 - span && b[3] < y1 + span);
+  const out = [Infinity, Infinity, -Infinity, -Infinity]; keep.forEach(b => { out[0] = Math.min(out[0], b[0]); out[1] = Math.min(out[1], b[1]); out[2] = Math.max(out[2], b[2]); out[3] = Math.max(out[3], b[3]); });
+  return isFinite(out[0]) ? out : docBB(doc);
+}
+function zoomExtents() { zoomBB(robustBB()); draw(); }
+function zoomAt(sx, sy, f) { const w = s2w(sx, sy); view.s = Math.min(Math.max(view.s * f, 1e-7), 1e7); view.tx = sx - w.x * view.s; view.ty = sy + w.y * view.s; draw(); }
+
+// ---------- colors ----------
+const lum = h => { const n = parseInt(h.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+var darkCache = {};
+function forCanvas(hex) { // keep bright ACI colors readable on a light canvas
+  if (!/^#[0-9a-f]{6}$/i.test(hex) || lum(TH['--canvas'] || '#000000') < 0.5) return hex;
+  if (darkCache[hex]) return darkCache[hex];
+  const n = parseInt(hex.slice(1), 16), L = lum(hex); const f = L > 0.55 ? 0.55 / L : 1;
+  const c = '#' + [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * f).toString(16).padStart(2, '0')).join('');
+  return darkCache[hex] = c;
+}
+function cssACI(i, rgb) {
+  if (rgb != null && rgb >= 0) return forCanvas('#' + (rgb & 0xffffff).toString(16).padStart(6, '0'));
+  if (i === 7 || i == null) return TH['--ink'];
+  return forCanvas(ACI[i] || TH['--ink']);
+}
+function entColor(e, inh) {
+  if (e.rgb != null) return cssACI(0, e.rgb);
+  let c = e.color;
+  if (c === 0) return inh || TH['--ink'];
+  if (c === 256 || c == null) { const L = doc.layers.get(e.layer); if (e.layer === '0' && inh) return inh; return L ? cssACI(L.color, L.rgb) : TH['--ink']; }
+  return cssACI(c);
+}
+function entLt(e) { const lt = e.lt || (doc.layers.get(e.layer) || {}).lt; return ltPattern(lt); }
+const DASH = { DASHED: [10, 5], HIDDEN: [6, 4], CENTER: [18, 4, 4, 4], PHANTOM: [18, 4, 4, 4, 4, 4], DOT: [1, 4] };
+
+// ---------- drawing ----------
+let rafPending = false;
+function draw() { if (!rafPending) { rafPending = true; requestAnimationFrame(() => { rafPending = false; render(); }); } }
+function layerVisible(name) { const L = doc.layers.get(name); return !L || L.on; }
+function render() {
+  const d = view.dpr; ctx.setTransform(d, 0, 0, d, 0, 0);
+  ctx.fillStyle = TH['--canvas']; ctx.fillRect(0, 0, view.w, view.h);
+  if (st.grid) drawGrid();
+  ctx.setTransform(d * view.s, 0, 0, -d * view.s, d * view.tx, d * view.ty);
+  const tl = s2w(0, 0), br = s2w(view.w, view.h), vb = [tl.x, br.y, br.x, tl.y];
+  const pxw = 1 / view.s;
+  for (const e of doc.ents) {
+    if (!layerVisible(e.layer)) continue;
+    const bb = entBB(e, doc);
+    if (e.type !== 'XLINE' && (bb[2] < vb[0] || bb[0] > vb[2] || bb[3] < vb[1] || bb[1] > vb[3])) continue;
+    const hi = sel.has(e.id), ho = hover === e;
+    drawEnt(e, null, pxw, 0, hi ? 'sel' : ho ? 'hover' : null);
+  }
+  if (req && req.preview && mouse.in) { try { const tmp = req.preview(curPoint()); for (const e of tmp || []) drawEnt(e, null, pxw, 0, 'preview'); } catch (err) { } }
+  ctx.setTransform(d, 0, 0, d, 0, 0); ctx.setLineDash([]);
+  // grips
+  if (!running && sel.size && sel.size <= 200) {
+    ctx.fillStyle = TH['--grip']; ctx.strokeStyle = TH['--canvas']; ctx.lineWidth = 1;
+    for (const e of doc.ents) if (sel.has(e.id)) for (const g of grips(e)) { const s = w2s(g.p); ctx.fillRect(s.x - 4, s.y - 4, 8, 8); ctx.strokeRect(s.x - 4, s.y - 4, 8, 8); }
+  }
+  // rubber band from base
+  if (req && req.base && mouse.in && req.type === 'point' && !req.noBand) { const a = w2s(req.base), b = w2s(curPoint()); ctx.strokeStyle = TH['--hover']; ctx.setLineDash([4, 4]); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.setLineDash([]); }
+  if (boxSel) {
+    const cross = boxSel.x1 < boxSel.x0; ctx.fillStyle = cross ? TH['--box-cross'] : TH['--box-win']; ctx.strokeStyle = TH['--sel']; ctx.setLineDash(cross ? [5, 4] : []);
+    const x = Math.min(boxSel.x0, boxSel.x1), y = Math.min(boxSel.y0, boxSel.y1), w = Math.abs(boxSel.x1 - boxSel.x0), h = Math.abs(boxSel.y1 - boxSel.y0);
+    ctx.fillRect(x, y, w, h); ctx.strokeRect(x + .5, y + .5, w, h); ctx.setLineDash([]);
+  }
+  if (snapHit && mouse.in) drawSnapMarker(snapHit);
+  if (mouse.in && !panDrag) drawCursor();
+}
+function drawGrid() {
+  const target = 14 / view.s; const k = Math.pow(10, Math.floor(Math.log10(target)));
+  const step = [1, 2, 5, 10].map(m => m * k).find(v => v >= target);
+  const tl = s2w(0, 0), br = s2w(view.w, view.h);
+  const x0 = Math.floor(tl.x / step) * step, y0 = Math.floor(br.y / step) * step;
+  const nx = (br.x - x0) / step, ny = (tl.y - y0) / step; if (nx * ny > 40000) return;
+  ctx.fillStyle = TH['--canvas-grid'];
+  for (let x = x0; x <= br.x; x += step) for (let y = y0; y <= tl.y; y += step) { const s = w2s(P(x, y)); ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1); }
+  ctx.strokeStyle = TH['--canvas-grid-major']; ctx.lineWidth = 1; ctx.beginPath();
+  const o = w2s(P(0, 0)); ctx.moveTo(o.x + .5, 0); ctx.lineTo(o.x + .5, view.h); ctx.moveTo(0, o.y + .5); ctx.lineTo(view.w, o.y + .5); ctx.stroke();
+}
+function drawCursor() {
+  const { sx, sy } = mouse; const p = snapHit ? w2s(snapHit.p) : P(sx, sy);
+  ctx.strokeStyle = TH['--ink']; ctx.globalAlpha = 0.85; ctx.lineWidth = 1; ctx.beginPath();
+  const arm = req && req.type === 'point' ? 40 : 0;
+  if (arm) { ctx.moveTo(p.x - arm, p.y + .5); ctx.lineTo(p.x + arm, p.y + .5); ctx.moveTo(p.x + .5, p.y - arm); ctx.lineTo(p.x + .5, p.y + arm); }
+  else { ctx.rect(p.x - 4.5, p.y - 4.5, 9, 9); ctx.moveTo(p.x - 14, p.y + .5); ctx.lineTo(p.x - 5, p.y + .5); ctx.moveTo(p.x + 5, p.y + .5); ctx.lineTo(p.x + 14, p.y + .5); ctx.moveTo(p.x + .5, p.y - 14); ctx.lineTo(p.x + .5, p.y - 5); ctx.moveTo(p.x + .5, p.y + 5); ctx.lineTo(p.x + .5, p.y + 14); }
+  ctx.stroke(); ctx.globalAlpha = 1;
+}
+function drawSnapMarker(h) {
+  const s = w2s(h.p); ctx.strokeStyle = TH['--snap']; ctx.lineWidth = 2; ctx.beginPath();
+  const r = 6;
+  if (h.k === 'END') ctx.rect(s.x - r, s.y - r, 2 * r, 2 * r);
+  else if (h.k === 'MID') { ctx.moveTo(s.x, s.y - r); ctx.lineTo(s.x + r, s.y + r); ctx.lineTo(s.x - r, s.y + r); ctx.closePath(); }
+  else if (h.k === 'CEN') ctx.arc(s.x, s.y, r, 0, TAU);
+  else if (h.k === 'QUA') { ctx.moveTo(s.x, s.y - r); ctx.lineTo(s.x + r, s.y); ctx.lineTo(s.x, s.y + r); ctx.lineTo(s.x - r, s.y); ctx.closePath(); }
+  else if (h.k === 'INT') { ctx.moveTo(s.x - r, s.y - r); ctx.lineTo(s.x + r, s.y + r); ctx.moveTo(s.x + r, s.y - r); ctx.lineTo(s.x - r, s.y + r); }
+  else if (h.k === 'PER') { ctx.moveTo(s.x - r, s.y - r); ctx.lineTo(s.x - r, s.y + r); ctx.lineTo(s.x + r, s.y + r); ctx.moveTo(s.x - r, s.y); ctx.lineTo(s.x, s.y); ctx.lineTo(s.x, s.y + r); }
+  else { ctx.arc(s.x, s.y, r, 0, TAU); ctx.moveTo(s.x - r, s.y); ctx.lineTo(s.x + r, s.y); }
+  ctx.stroke();
+  ctx.font = '600 10px "IBM Plex Mono", ui-monospace, monospace'; ctx.fillStyle = TH['--snap']; ctx.fillText(h.k, s.x + 10, s.y - 10);
+}
+function pathPrimsLocal(e) { // builds path for entity in current ctx transform
+  switch (e.type) {
+    case 'LINE': ctx.moveTo(e.a.x, e.a.y); ctx.lineTo(e.b.x, e.b.y); return true;
+    case 'CIRCLE': ctx.moveTo(e.c.x + e.r, e.c.y); ctx.arc(e.c.x, e.c.y, e.r, 0, TAU); return true;
+    case 'ARC': { const sw = normA(e.ea - e.sa) || TAU; ctx.moveTo(e.c.x + e.r * Math.cos(e.sa), e.c.y + e.r * Math.sin(e.sa)); ctx.arc(e.c.x, e.c.y, e.r, e.sa, e.sa + sw, false); return true; }
+    case 'PLINE': plPath(e.v, e.closed); return true;
+    case 'ELLIPSE': polyPath(tessEllipse(e)); return true;
+    case 'SPLINE': polyPath(tessSpline(e), e.closed); return true;
+    case 'XLINE': { const L = 1e7 / view.s; const a = e.ray ? e.p : add(e.p, mul(e.dir, -L)), b = add(e.p, mul(e.dir, L)); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); return true; }
+  }
+  return false;
+}
+function plPath(v, closed) {
+  const n = v.length; if (!n) return; ctx.moveTo(v[0].x, v[0].y);
+  for (let i = 0; i < (closed ? n : n - 1); i++) {
+    const p = v[i], q = v[(i + 1) % n];
+    if (p.b && Math.abs(p.b) > 1e-9 && dist(p, q) > 1e-12) { const a = bulgeArc(p, q, p.b); if (p.b > 0) ctx.arc(a.c.x, a.c.y, a.r, a.sa, a.ea, false); else ctx.arc(a.c.x, a.c.y, a.r, a.ea, a.sa, true); }
+    else ctx.lineTo(q.x, q.y);
+  }
+  if (closed) ctx.closePath();
+}
+function polyPath(pts, closed) { if (!pts.length) return; ctx.moveTo(pts[0].x, pts[0].y); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y); if (closed) ctx.closePath(); }
+function drawEnt(e, inh, pxw, depth, mode) {
+  const col = mode === 'sel' ? TH['--sel'] : mode === 'preview' ? TH['--hover'] : entColor(e, inh);
+  const lw = (mode === 'hover' ? 2.2 : mode === 'sel' ? 1.6 : 1) * pxw;
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = lw;
+  const lt = entLt(e);
+  if (mode === 'sel') ctx.setLineDash([6 * pxw, 3 * pxw]); else if (lt && DASH[lt]) ctx.setLineDash(DASH[lt].map(x => x * pxw)); else ctx.setLineDash([]);
+  if (mode === 'hover') { ctx.strokeStyle = TH['--hover']; ctx.fillStyle = TH['--hover']; }
+  ctx.beginPath();
+  if (pathPrimsLocal(e)) { ctx.stroke(); return; }
+  switch (e.type) {
+    case 'POINT': { const r = 3 * pxw; ctx.moveTo(e.p.x - r, e.p.y); ctx.lineTo(e.p.x + r, e.p.y); ctx.moveTo(e.p.x, e.p.y - r); ctx.lineTo(e.p.x, e.p.y + r); ctx.stroke(); return; }
+    case 'SOLID': polyPath(e.pts, true); if (e.fill) ctx.fill(); else ctx.stroke(); return;
+    case 'HATCH': {
+      for (const l of e.loops) plPath(l, true);
+      if (e.solid) { ctx.globalAlpha = mode ? 0.5 : 1; ctx.fill('evenodd'); ctx.globalAlpha = 1; return; }
+      ctx.save(); ctx.clip('evenodd');
+      const bb = entBB(e, doc), sp = 8 * pxw, a = /ANSI3[2-8]|NET|BOX/i.test(e.pattern) ? 2 : 1;
+      ctx.beginPath(); const W = bb[2] - bb[0], H = bb[3] - bb[1];
+      for (let k = -H; k < W + H; k += sp) { ctx.moveTo(bb[0] + k, bb[1]); ctx.lineTo(bb[0] + k + H, bb[3]); if (a === 2) { ctx.moveTo(bb[0] + k, bb[3]); ctx.lineTo(bb[0] + k + H, bb[1]); } }
+      ctx.globalAlpha = 0.75; ctx.stroke(); ctx.restore(); ctx.globalAlpha = 1; return;
+    }
+    case 'TEXT': case 'MTEXT': return drawText(e, mode);
+    case 'DIM': return drawDim(e, pxw);
+    case 'INSERT': {
+      const blk = doc.blocks.get(e.name); if (!blk || depth > 6) return;
+      const m = insertM(e, blk); ctx.save(); ctx.transform(m.a, m.b, m.c, m.d, m.e, m.f);
+      const sc = Math.sqrt(Math.abs(mDet(m))) || 1;
+      for (const be of blk.ents) { if (!layerVisible(be.layer) && be.layer !== '0') continue; drawEnt(be, mode === 'sel' || mode === 'hover' || mode === 'preview' ? null : col, pxw / sc, depth + 1, mode); }
+      ctx.restore(); return;
+    }
+  }
+}
+function drawText(e, mode) {
+  const lines = textLines(e), h = e.h || 1, box = textBox(e), a = textAnchor(e);
+  ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(e.rot || 0); ctx.scale(h / 100, -h / 100);
+  ctx.font = '100px "IBM Plex Mono", ui-monospace, monospace'; ctx.textBaseline = 'alphabetic';
+  if (e.type === 'TEXT') ctx.fillText(lines[0], box[0] / h * 100, -box[1] / h * 100);
+  else lines.forEach((l, i) => { const y = box[3] - h * (1 + i * 1.66); const lw = l.length * h * CHAR_W; const at = (e.attach || 1) - 1, col = at % 3; const bw = box[2] - box[0]; const x = box[0] + (col === 1 ? (bw - lw) / 2 : col === 2 ? bw - lw : 0); ctx.fillText(l, x / h * 100, -y / h * 100); });
+  ctx.restore();
+}
+function drawDim(e, pxw) {
+  const g = dimGeom(e), ah = e.ah || 2.5;
+  ctx.moveTo(g.a.x, g.a.y); ctx.lineTo(g.b.x, g.b.y); ctx.moveTo(g.e1[0].x, g.e1[0].y); ctx.lineTo(g.e1[1].x, g.e1[1].y); ctx.moveTo(g.e2[0].x, g.e2[0].y); ctx.lineTo(g.e2[1].x, g.e2[1].y); ctx.stroke();
+  ctx.setLineDash([]); ctx.beginPath();
+  for (const [p, d] of [[g.a, g.dir], [g.b, mul(g.dir, -1)]]) { const n = P(-d.y, d.x); ctx.moveTo(p.x, p.y); const q = add(p, mul(d, ah)); ctx.lineTo(q.x + n.x * ah / 6, q.y + n.y * ah / 6); ctx.lineTo(q.x - n.x * ah / 6, q.y - n.y * ah / 6); ctx.closePath(); }
+  ctx.fill();
+  const th = e.th || 2.5, mid = mul(add(g.a, g.b), 0.5); let rot = Math.atan2(g.dir.y, g.dir.x); if (rot > Math.PI / 2 + 1e-6 || rot < -Math.PI / 2 + 1e-6) rot += Math.PI;
+  const tpos = add(mid, mul(g.nrm, g.sgn * th * 0.6));
+  drawText({ type: 'TEXT', p: tpos, p2: tpos, h: th, rot, text: dimText(e), ha: 1, va: 1 });
+}
+
+// ---------- grips ----------
+function grips(e) {
+  switch (e.type) {
+    case 'LINE': return [{ p: e.a, k: 'a' }, { p: e.b, k: 'b' }, { p: mul(add(e.a, e.b), 0.5), k: 'mid' }];
+    case 'CIRCLE': return [{ p: e.c, k: 'c' }, ...[0, 1, 2, 3].map(i => ({ p: polar(e.c, e.r, i * Math.PI / 2), k: 'r' }))];
+    case 'ARC': return [{ p: e.c, k: 'c' }, { p: polar(e.c, e.r, e.sa), k: 'sa' }, { p: polar(e.c, e.r, e.ea), k: 'ea' }];
+    case 'PLINE': return e.v.map((v, i) => ({ p: P(v.x, v.y), k: 'v', i }));
+    case 'TEXT': case 'MTEXT': return [{ p: textAnchor(e), k: 'p' }];
+    case 'INSERT': return e.dimblk ? [] : [{ p: e.p, k: 'p' }];
+    case 'POINT': return [{ p: e.p, k: 'p' }];
+    case 'ELLIPSE': return [{ p: e.c, k: 'c' }];
+    case 'DIM': return [{ p: e.p1, k: 'p1' }, { p: e.p2, k: 'p2' }, { p: dimGeom(e).a, k: 'dl' }];
+  }
+  return [];
+}
+function applyGrip(e, g, p) {
+  switch (g.k) {
+    case 'a': e.a = p; break; case 'b': e.b = p; break;
+    case 'mid': { const d = sub(p, g.p); e.a = add(e.a, d); e.b = add(e.b, d); break; }
+    case 'c': xform(e, mTrans(p.x - g.p.x, p.y - g.p.y)); return;
+    case 'r': e.r = Math.max(1e-9, dist(e.c, p)); break;
+    case 'sa': e.sa = ang(e.c, p); break; case 'ea': e.ea = ang(e.c, p); break;
+    case 'v': e.v[g.i].x = p.x; e.v[g.i].y = p.y; break;
+    case 'p': xform(e, mTrans(p.x - g.p.x, p.y - g.p.y)); return;
+    case 'p1': e.p1 = p; break; case 'p2': e.p2 = p; break; case 'dl': e.dl = p; break;
+  }
+  invalidate(e);
+}
+
+// ---------- picking & snapping ----------
+function entAt(sx, sy, filter) {
+  const p = s2w(sx, sy), tol = 6 / view.s; let best = null, bd = tol;
+  for (let i = doc.ents.length - 1; i >= 0; i--) {
+    const e = doc.ents[i]; const L = doc.layers.get(e.layer); if (L && (!L.on)) continue; if (filter && !filter(e)) continue;
+    const bb = entBB(e, doc); if (e.type !== 'XLINE' && (p.x < bb[0] - tol || p.x > bb[2] + tol || p.y < bb[1] - tol || p.y > bb[3] + tol)) continue;
+    const d = entDist(e, p, doc); if (d < bd || (d === 0 && bd === 0 && e.type !== 'HATCH')) { bd = d; best = e; if (d === 0 && e.type !== 'HATCH') break; }
+  }
+  return best;
+}
+function selectable(e) { const L = doc.layers.get(e.layer); return !L || (L.on && !L.locked); }
+function computeSnap(sx, sy) {
+  if (!req || req.type !== 'point') return null;
+  const p = s2w(sx, sy), tol = 12 / view.s; let best = null;
+  const consider = (k, q, pri) => { const d = dist(p, q) - (pri || 0) * tol * 0.25; if (d < tol && (!best || d < best.d)) best = { k, p: q, d }; };
+  if (st.osnap) {
+    const near = [];
+    for (const e of doc.ents) {
+      if (!layerVisible(e.layer) || e.type === 'XLINE' || e.type === 'HATCH') continue;
+      const bb = entBB(e, doc); if (p.x < bb[0] - tol || p.x > bb[2] + tol || p.y < bb[1] - tol || p.y > bb[3] + tol) continue;
+      if (e.type === 'TEXT' || e.type === 'MTEXT') { consider('INS', textAnchor(e)); continue; }
+      const prs = entPrims(e, doc).filter(q => !q.textbox);
+      let close = false;
+      for (const q of prs) {
+        if (dPrim(p, q) > tol * 2.5 && q.t !== 'P') continue; close = true;
+        if (q.t === 'P') { consider(q.ins ? 'INS' : 'NOD', q.p); continue; }
+        if (q.t === 'S') { consider('END', q.a, 1); consider('END', q.b, 1); consider('MID', mul(add(q.a, q.b), 0.5)); if (req.base) { const ab = sub(q.b, q.a), L2 = dot(ab, ab); if (L2) { const t = dot(sub(req.base, q.a), ab) / L2; if (t > 0 && t < 1) consider('PER', add(q.a, mul(ab, t)), -0.5); } } }
+        else { consider('CEN', q.c, -1); const full = Math.abs(normA(q.ea - q.sa)) < 1e-9; if (!full) { consider('END', polar(q.c, q.r, q.sa), 1); consider('END', polar(q.c, q.r, q.ea), 1); consider('MID', polar(q.c, q.r, q.sa + (normA(q.ea - q.sa)) / 2)); } for (let k = 0; k < 4; k++) if (full || inSweep(k * Math.PI / 2, q.sa, q.ea)) consider('QUA', polar(q.c, q.r, k * Math.PI / 2)); }
+      }
+      // center snap when hovering near the rim of a circle
+      if (close) near.push(e);
+      if (near.length > 40) break;
+    }
+    for (let i = 0; i < near.length; i++) for (let j = i; j < near.length; j++) {
+      const A = entPrims(near[i], doc).filter(q => !q.textbox && q.t !== 'P' && dPrim(p, q) < tol * 2), B = i === j ? A : entPrims(near[j], doc).filter(q => !q.textbox && q.t !== 'P' && dPrim(p, q) < tol * 2);
+      for (let a = 0; a < A.length; a++) for (let b = i === j ? a + 1 : 0; b < B.length; b++) for (const x of ixPrim(A[a], B[b])) consider('INT', x, 1.2);
+    }
+  }
+  if (!best && st.snap) { const u = st.snapUnit; best = { k: 'GRID', p: P(Math.round(p.x / u) * u, Math.round(p.y / u) * u) }; }
+  return best;
+}
+function curPoint() {
+  let p = snapHit ? snapHit.p : s2w(mouse.sx, mouse.sy);
+  if (st.ortho && req && req.base && !snapHit) { const d = sub(p, req.base); p = Math.abs(d.x) > Math.abs(d.y) ? P(p.x, req.base.y) : P(req.base.x, p.y); }
+  return p;
+}
+
+// ---------- command line / input broker ----------
+const histEl = $('#hist'), inEl = $('#cmdin'), promptEl = $('#prompt');
+function log(msg, cls) { const d = document.createElement('div'); d.textContent = msg; if (cls) d.className = cls; histEl.appendChild(d); while (histEl.children.length > 200) histEl.firstChild.remove(); histEl.scrollTop = histEl.scrollHeight; }
+function setPrompt(t, kws) {
+  promptEl.innerHTML = '';
+  const s = document.createElement('span'); s.textContent = (t || 'Command') + (kws && kws.length ? ' ' : ''); promptEl.appendChild(s);
+  if (kws && kws.length) { promptEl.append('['); kws.forEach((k, i) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'kw'; b.textContent = k; b.onclick = () => submitInput(k); promptEl.appendChild(b); if (i < kws.length - 1) promptEl.append('/'); }); promptEl.append(']'); }
+  promptEl.append(':');
+}
+class Cancel extends Error { }
+function ask(o) { return new Promise((resolve, reject) => { req = Object.assign({ resolve, reject }, o); setPrompt(o.prompt, o.keywords); snapHit = computeSnap(mouse.sx, mouse.sy); draw(); }); }
+const getPoint = (prompt, o = {}) => ask(Object.assign({ type: 'point', prompt }, o));
+const getText = (prompt, o = {}) => ask(Object.assign({ type: 'text', prompt }, o));
+const getNum = (prompt, o = {}) => ask(Object.assign({ type: 'num', prompt }, o));
+const getPick = (prompt, o = {}) => ask(Object.assign({ type: 'pick', prompt }, o));
+async function getSel(prompt = 'Select objects') {
+  if (sel.size) { const r = doc.ents.filter(e => sel.has(e.id)); log(`${r.length} object${r.length > 1 ? 's' : ''} selected`); return r; }
+  while (true) { const r = await ask({ type: 'sel', prompt, allowEmpty: true }); if (r.empty) { const out = doc.ents.filter(e => sel.has(e.id)); if (out.length) return out; throw new Cancel(); } }
+}
+function resolveReq(v) { const r = req; req = null; snapHit = null; setPrompt(running ? '…' : 'Command'); r.resolve(v); draw(); }
+function matchKw(s, kws) { if (!kws) return null; const u = s.toUpperCase(); for (const k of kws) { const ab = k.replace(/[^A-Z]/g, '') || k[0].toUpperCase(); if (k.toUpperCase() === u || ab === u || k[0].toUpperCase() === u) return k; } return null; }
+function parseCoord(s, base) {
+  s = s.trim(); let rel = false; if (s[0] === '@') { rel = true; s = s.slice(1); }
+  const b = rel || (s.includes('<') && base) ? (base || lastPt || P(0, 0)) : P(0, 0);
+  let m = s.match(/^(-?[\d.]+(?:e-?\d+)?)\s*<\s*(-?[\d.]+)$/i);
+  if (m) { const p = polar(rel ? b : P(0, 0), +m[1], +m[2] * D2R); return p; }
+  m = s.match(/^(-?[\d.]+(?:e-?\d+)?)\s*,\s*(-?[\d.]+(?:e-?\d+)?)$/i);
+  if (m) return rel ? P(b.x + +m[1], b.y + +m[2]) : P(+m[1], +m[2]);
+  return null;
+}
+function submitInput(raw) {
+  const s = (raw != null ? raw : inEl.value).trim(); inEl.value = '';
+  if (!req) {
+    if (!s) { if (lastCmd) runCommand(lastCmd); return; }
+    if (running) return;
+    return runCommand(s);
+  }
+  if (s) log(`${promptEl.textContent} ${s}`, 'echo');
+  const kw = s ? matchKw(s, req.keywords) : null;
+  if (kw) return resolveReq({ kw });
+  if (!s) { if (req.allowEmpty || req.def != null) return resolveReq(req.def != null && req.type === 'num' ? { num: req.def } : req.def != null && req.type === 'text' ? { text: String(req.def) } : { empty: true }); return; }
+  if (req.type === 'text') return resolveReq({ text: raw != null ? raw : s });
+  if (req.type === 'num') { const v = parseFloat(s); if (!isNaN(v) && /^-?[\d.]+(e-?\d+)?$/i.test(s)) return resolveReq({ num: v }); const p = parseCoord(s, req.base); if (p && req.base) return resolveReq({ num: dist(req.base, p), pt: p }); log('Enter a number.', 'err'); return; }
+  if (req.type === 'point') {
+    const p = parseCoord(s, req.base);
+    if (p) return resolveReq({ pt: p });
+    const v = parseFloat(s);
+    if (!isNaN(v) && /^-?[\d.]+$/.test(s)) {
+      if (req.acceptNum) return resolveReq({ num: v });
+      if (req.base) { const c = curPoint(); const t = ang(req.base, c); return resolveReq({ pt: polar(req.base, v, dist(req.base, c) > 1e-12 ? t : 0) }); }
+    }
+    log('Enter a point as x,y  or @dx,dy  or @dist<angle.', 'err'); return;
+  }
+  if (req.type === 'sel' && /^all$/i.test(s)) { doc.ents.filter(selectable).forEach(e => sel.add(e.id)); updateProps(); draw(); return; }
+}
+inEl.addEventListener('keydown', ev => {
+  if (ev.key === 'Enter' || (ev.key === ' ' && !(req && req.type === 'text'))) { ev.preventDefault(); submitInput(); }
+  else if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+  else if (ev.key === 'ArrowUp' && !inEl.value && lastCmd && !running) { inEl.value = lastCmd; }
+});
+function cancel() { if (req) { const r = req; req = null; snapHit = null; r.reject(new Cancel()); } else if (sel.size) { sel.clear(); updateProps(); } inEl.value = ''; setPrompt('Command'); draw(); }
+
+// ---------- undo ----------
+const ser = () => JSON.stringify({ ents: doc.ents, blocks: [...doc.blocks.values()], layers: [...doc.layers.values()], clayer: doc.clayer }, (k, v) => k.startsWith('_') ? undefined : v);
+function pushUndo() { undoStack.push(ser()); if (undoStack.length > 60) undoStack.shift(); redoStack = []; markDirty(); }
+function restore(s) { const o = JSON.parse(s); doc.ents = o.ents; doc.blocks = new Map(o.blocks.map(b => [b.name, b])); doc.layers = new Map(o.layers.map(l => [l.name, l])); doc.clayer = o.clayer; sel.clear(); refreshLayers(); updateProps(); draw(); }
+function undo() { if (!undoStack.length) return log('Nothing to undo.'); redoStack.push(ser()); restore(undoStack.pop()); log('Undo'); }
+function redo() { if (!redoStack.length) return log('Nothing to redo.'); undoStack.push(ser()); restore(redoStack.pop()); log('Redo'); }
+let dirty = false; function markDirty() { dirty = true; docIsExample = false; updateTitle(); }
+
+// ---------- entity helpers ----------
+function addEnt(e) { if (e.layer == null || e.layer === '0' && doc.clayer !== '0' && !e._keepLayer) e.layer = doc.clayer; if (e.color === 256 && st.color !== 256) e.color = st.color; if (st.lt && !e.lt) e.lt = st.lt; doc.ents.push(e); return e; }
+const newE = (t, props) => mk(t, props, doc.clayer, st.color);
+function removeEnts(list) { const ids = new Set(list.map(e => e.id)); doc.ents = doc.ents.filter(e => !ids.has(e.id)); ids.forEach(i => sel.delete(i)); }
+function replaceEnt(e, arr) { const i = doc.ents.indexOf(e); if (i < 0) return; doc.ents.splice(i, 1, ...arr); sel.delete(e.id); }
+
+// ---------- commands ----------
+const CMDS = {};
+const ALIASES = {};
+function def(names, fn, desc) { const [main, ...al] = names; CMDS[main] = { fn, desc, name: main }; ALIASES[main] = main; al.forEach(a => ALIASES[a] = main); }
+async function runCommand(s) {
+  const key = s.trim().toUpperCase().replace(/^_+/, ''); const name = ALIASES[key];
+  if (!name) { log(`Unknown command "${s}". Type HELP for the list.`, 'err'); return; }
+  if (running) { cancel(); await new Promise(r => setTimeout(r, 0)); }
+  running = name; lastCmd = name; log(name, 'cmd'); highlightTool(name);
+  const before = ser(); let changed = false;
+  try { changed = await CMDS[name].fn(); }
+  catch (err) { if (err instanceof Cancel) log('*Cancel*', 'dim'); else { console.error(err); log('Error: ' + err.message, 'err'); } changed = ser() !== before; }
+  if (changed !== false && CMDS[name].mod !== false && ser() !== before) { undoStack.push(before); if (undoStack.length > 60) undoStack.shift(); redoStack = []; markDirty(); }
+  running = null; req = null; highlightTool(null); setPrompt('Command'); updateProps(); refreshLayers(); draw();
+}
+function needPoint(r) { if (r.pt) { lastPt = r.pt; return r.pt; } return null; }
+
+def(['LINE', 'L'], async () => {
+  let p0 = needPoint(await getPoint('Specify first point')); const first = p0, made = [];
+  while (true) {
+    const r = await getPoint('Specify next point', { base: p0, allowEmpty: true, keywords: made.length >= 2 ? ['Close', 'Undo'] : made.length ? ['Undo'] : [], preview: c => [mk('LINE', { a: p0, b: c }, doc.clayer)] });
+    if (r.empty) break;
+    if (r.kw === 'Close') { made.push(addEnt(newE('LINE', { a: p0, b: first }))); break; }
+    if (r.kw === 'Undo') { const e = made.pop(); removeEnts([e]); p0 = e.a; continue; }
+    const p = needPoint(r); made.push(addEnt(newE('LINE', { a: p0, b: p }))); p0 = p; draw();
+  }
+}, 'Draw line segments');
+def(['PLINE', 'PL'], async () => {
+  const v = [{ ...needPoint(await getPoint('Specify start point')), b: 0 }]; let arc = false;
+  const tangent = () => { if (v.length < 2) return P(1, 0); const p = v[v.length - 2], q = v[v.length - 1]; if (p.b) { const a = bulgeArc(p, q, p.b); const t = ang(a.c, q) + (p.b > 0 ? Math.PI / 2 : -Math.PI / 2); return P(Math.cos(t), Math.sin(t)); } const d = sub(q, p); return mul(d, 1 / (len(d) || 1)); };
+  const bulgeTo = (q) => { const p = v[v.length - 1], d = tangent(), ch = sub(q, p); const a = Math.atan2(cross(d, ch), dot(d, ch)); return Math.tan(a / 2); };
+  const temp = c => { const vv = v.map(x => ({ ...x })); if (arc) vv[vv.length - 1].b = bulgeTo(c); vv.push({ x: c.x, y: c.y, b: 0 }); return [mk('PLINE', { v: vv, closed: false }, doc.clayer)]; };
+  while (true) {
+    const last = v[v.length - 1];
+    const r = await getPoint(arc ? 'Specify arc end point' : 'Specify next point', { base: P(last.x, last.y), allowEmpty: true, noBand: arc, keywords: [arc ? 'Line' : 'Arc', ...(v.length > 2 ? ['Close'] : []), ...(v.length > 1 ? ['Undo'] : [])], preview: temp });
+    if (r.empty) break;
+    if (r.kw === 'Arc') { arc = true; continue; } if (r.kw === 'Line') { arc = false; continue; }
+    if (r.kw === 'Undo') { v.pop(); v[v.length - 1].b = 0; continue; }
+    if (r.kw === 'Close') { if (arc) v[v.length - 1].b = bulgeTo(v[0]); addEnt(newE('PLINE', { v, closed: true })); return; }
+    const p = needPoint(r); if (arc) v[v.length - 1].b = bulgeTo(p); v.push({ x: p.x, y: p.y, b: 0 });
+  }
+  if (v.length > 1) addEnt(newE('PLINE', { v, closed: false }));
+}, 'Draw a polyline with line and arc segments');
+def(['RECTANG', 'REC', 'RECT'], async () => {
+  const a = needPoint(await getPoint('Specify first corner'));
+  const mkR = c => [{ x: a.x, y: a.y, b: 0 }, { x: c.x, y: a.y, b: 0 }, { x: c.x, y: c.y, b: 0 }, { x: a.x, y: c.y, b: 0 }];
+  const r = await getPoint('Specify other corner (or @width,height)', { base: a, noBand: true, preview: c => [mk('PLINE', { v: mkR(c), closed: true }, doc.clayer)] });
+  addEnt(newE('PLINE', { v: mkR(needPoint(r)), closed: true }));
+}, 'Draw a rectangle');
+def(['CIRCLE', 'C'], async () => {
+  let r = await getPoint('Specify center point', { keywords: ['3P', '2P'] });
+  if (r.kw === '2P') { const a = needPoint(await getPoint('First end of diameter')); const b = needPoint(await getPoint('Second end of diameter', { base: a, preview: c => [mk('CIRCLE', { c: mul(add(a, c), .5), r: dist(a, c) / 2 }, doc.clayer)] })); addEnt(newE('CIRCLE', { c: mul(add(a, b), .5), r: dist(a, b) / 2 })); return; }
+  if (r.kw === '3P') { const a = needPoint(await getPoint('First point')); const b = needPoint(await getPoint('Second point', { base: a })); const c = needPoint(await getPoint('Third point', { base: b, preview: q => { const k = circum(a, b, q); return k ? [mk('CIRCLE', k, doc.clayer)] : []; } })); const k = circum(a, b, c); if (!k) throw new Error('Points are collinear.'); addEnt(newE('CIRCLE', k)); return; }
+  const c = needPoint(r);
+  const q = await getPoint('Specify radius', { base: c, acceptNum: true, keywords: ['Diameter'], preview: p => [mk('CIRCLE', { c, r: dist(c, p) }, doc.clayer)] });
+  let rad;
+  if (q.kw === 'Diameter') { const d = await getPoint('Specify diameter', { base: c, acceptNum: true, preview: p => [mk('CIRCLE', { c, r: dist(c, p) / 2 }, doc.clayer)] }); rad = d.num != null ? d.num / 2 : dist(c, d.pt) / 2; }
+  else rad = q.num != null ? q.num : dist(c, q.pt);
+  if (!(rad > 0)) throw new Error('Radius must be greater than zero.');
+  addEnt(newE('CIRCLE', { c, r: rad }));
+}, 'Draw a circle');
+function circum(a, b, c) { const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)); if (Math.abs(d) < 1e-12) return null; const ux = ((a.x * a.x + a.y * a.y) * (b.y - c.y) + (b.x * b.x + b.y * b.y) * (c.y - a.y) + (c.x * c.x + c.y * c.y) * (a.y - b.y)) / d, uy = ((a.x * a.x + a.y * a.y) * (c.x - b.x) + (b.x * b.x + b.y * b.y) * (a.x - c.x) + (c.x * c.x + c.y * c.y) * (b.x - a.x)) / d; const cc = P(ux, uy); return { c: cc, r: dist(cc, a) }; }
+function arc3(a, b, c) { const k = circum(a, b, c); if (!k) return null; const ccw = cross(sub(b, a), sub(c, a)) > 0; const sa = ang(k.c, ccw ? a : c), ea = ang(k.c, ccw ? c : a); return { c: k.c, r: k.r, sa, ea }; }
+def(['ARC', 'A'], async () => {
+  const r0 = await getPoint('Specify start point of arc', { keywords: ['Center'] });
+  if (r0.kw === 'Center') {
+    const c = needPoint(await getPoint('Specify center point')); const s = needPoint(await getPoint('Specify start point', { base: c })); const r = dist(c, s), sa = ang(c, s);
+    const e = needPoint(await getPoint('Specify end point (counter-clockwise)', { base: c, preview: p => [mk('ARC', { c, r, sa, ea: ang(c, p) }, doc.clayer)] }));
+    addEnt(newE('ARC', { c, r, sa, ea: ang(c, e) })); return;
+  }
+  const a = needPoint(r0); const b = needPoint(await getPoint('Specify second point of arc', { base: a }));
+  const c = needPoint(await getPoint('Specify end point of arc', { base: b, preview: p => { const k = arc3(a, b, p); return k ? [mk('ARC', k, doc.clayer)] : []; } }));
+  const k = arc3(a, b, c); if (!k) throw new Error('Points are collinear.'); addEnt(newE('ARC', k));
+}, 'Draw an arc through 3 points, or center-start-end');
+def(['ELLIPSE', 'EL'], async () => {
+  const c = needPoint(await getPoint('Specify center of ellipse')); const m = needPoint(await getPoint('Specify endpoint of axis', { base: c }));
+  const maj = sub(m, c), L = len(maj);
+  const r = await getPoint('Specify distance to other axis', { base: c, acceptNum: true, preview: p => { const d = Math.abs(cross(maj, sub(p, c))) / L; return [mk('ELLIPSE', { c, maj, ratio: Math.max(d / L, 1e-6), sa: 0, ea: TAU }, doc.clayer)]; } });
+  const d = r.num != null ? r.num : Math.abs(cross(maj, sub(r.pt, c))) / L;
+  let e; if (d > L) e = { c, maj: mul(P(-maj.y, maj.x), d / L), ratio: L / d, sa: 0, ea: TAU }; else e = { c, maj, ratio: d / L, sa: 0, ea: TAU };
+  addEnt(newE('ELLIPSE', e));
+}, 'Draw an ellipse');
+def(['POLYGON', 'POL'], async () => {
+  const n = Math.round((await getNum('Enter number of sides', { def: 6 })).num); if (n < 3 || n > 1024) throw new Error('Use 3 to 1024 sides.');
+  const c = needPoint(await getPoint('Specify center of polygon'));
+  const k = await getPoint('Inscribed in circle or Circumscribed about circle', { keywords: ['Inscribed', 'Circumscribed'], allowEmpty: true, base: c, noBand: true }); const circ = k.kw === 'Circumscribed';
+  const mkP = p => { let R = dist(c, p), t0 = ang(c, p); if (circ) { R = R / Math.cos(Math.PI / n); t0 += Math.PI / n; } return Array.from({ length: n }, (_, i) => { const q = polar(c, R, t0 + i * TAU / n); return { x: q.x, y: q.y, b: 0 }; }); };
+  const r = await getPoint('Specify radius of circle', { base: c, acceptNum: true, preview: p => [mk('PLINE', { v: mkP(p), closed: true }, doc.clayer)] });
+  addEnt(newE('PLINE', { v: mkP(r.num != null ? polar(c, r.num, Math.PI / 2) : r.pt), closed: true }));
+}, 'Draw a regular polygon');
+def(['TEXT', 'T', 'DT', 'DTEXT', 'MTEXT', 'MT'], async () => {
+  const p = needPoint(await getPoint('Specify start point of text'));
+  const h = (await getNum(`Specify height <${st.textH}>`, { def: st.textH, base: p })).num; st.textH = h;
+  const rr = await getNum('Specify rotation angle <0>', { def: 0 }); const rot = rr.num * D2R;
+  const t = (await getText('Enter text (use \\P for a new line)')).text;
+  if (!t) return false;
+  addEnt(newE(t.includes('\\P') ? 'MTEXT' : 'TEXT', t.includes('\\P') ? { p, h, rot, text: t, attach: 1, w: 0 } : { p, h, rot, text: t, ha: 0, va: 0 }));
+}, 'Place text');
+def(['POINT', 'PO'], async () => { while (true) { const r = await getPoint('Specify a point', { allowEmpty: true }); if (r.empty) return; addEnt(newE('POINT', { p: needPoint(r) })); draw(); } }, 'Place point markers');
+def(['XLINE', 'XL'], async () => { const a = needPoint(await getPoint('Specify a point')); while (true) { const r = await getPoint('Specify through point', { base: a, allowEmpty: true, preview: c => dist(a, c) > 1e-9 ? [mk('XLINE', { p: a, dir: mul(sub(c, a), 1 / dist(a, c)) }, doc.clayer)] : [] }); if (r.empty) return; const b = needPoint(r); addEnt(newE('XLINE', { p: a, dir: mul(sub(b, a), 1 / dist(a, b)) })); } }, 'Construction line');
+
+function closedLoopOf(e) {
+  if (e.type === 'CIRCLE') return [{ x: e.c.x + e.r, y: e.c.y, b: 1 }, { x: e.c.x - e.r, y: e.c.y, b: 1 }];
+  if (e.type === 'PLINE' && (e.closed || dist(e.v[0], e.v[e.v.length - 1]) < 1e-9)) return e.v.map(v => ({ ...v }));
+  if (e.type === 'ELLIPSE' && normA(e.ea - e.sa) < 1e-9) return tessEllipse(e).slice(0, -1).map(p => ({ x: p.x, y: p.y, b: 0 }));
+  if (e.type === 'SPLINE' && e.closed) return tessSpline(e).map(p => ({ x: p.x, y: p.y, b: 0 }));
+  return null;
+}
+function loopArea(l) { const pts = plPoints(l, true); let a = 0; for (let i = 0; i < pts.length - 1; i++) a += cross(pts[i], pts[i + 1]); return Math.abs(a) / 2; }
+def(['HATCH', 'H', 'BH'], async () => {
+  let pattern = st.hatch || 'ANSI31', loops = [], r;
+  while (true) {
+    r = await getPoint(`Pick internal point (pattern ${pattern})`, { keywords: ['ANSI31', 'ANSI37', 'Solid', 'Select objects'], noBand: true });
+    if (r.kw === 'Select objects' || r.pt) break;
+    pattern = r.kw === 'Solid' ? 'SOLID' : r.kw; st.hatch = pattern;
+  }
+  if (r.kw) { const ents = await getSel('Select closed boundaries'); loops = ents.map(closedLoopOf).filter(Boolean); sel.clear(); }
+  else {
+    const p = r.pt; const cands = doc.ents.filter(e => layerVisible(e.layer)).map(e => ({ e, l: closedLoopOf(e) })).filter(o => o.l);
+    const containing = cands.filter(o => pointInPoly(p, plPoints(o.l, true))).sort((a, b) => loopArea(a.l) - loopArea(b.l));
+    if (!containing.length) throw new Error('No closed boundary around that point. Closed polylines, circles and full ellipses work as boundaries.');
+    const outer = containing[0]; loops = [outer.l]; const op = plPoints(outer.l, true);
+    for (const o of cands) if (o !== outer && loopArea(o.l) < loopArea(outer.l) && plPoints(o.l, true).every(q => pointInPoly(q, op)) && !pointInPoly(p, plPoints(o.l, true))) loops.push(o.l);
+  }
+  if (!loops.length) throw new Error('Nothing closed was selected.');
+  addEnt(newE('HATCH', { loops, solid: pattern === 'SOLID', pattern }));
+}, 'Fill a closed area');
+
+// modify
+function previewXf(ents, mf) { return c => ents.map(e => xform(cloneEnt(e), mf(c))); }
+def(['MOVE', 'M'], async () => {
+  const ents = await getSel(); const b = needPoint(await getPoint('Specify base point'));
+  const r = await getPoint('Specify second point', { base: b, preview: previewXf(ents, c => mTrans(c.x - b.x, c.y - b.y)) });
+  const p = needPoint(r); ents.forEach(e => xform(e, mTrans(p.x - b.x, p.y - b.y))); sel.clear();
+}, 'Move objects');
+def(['COPY', 'CO', 'CP'], async () => {
+  const ents = await getSel(); const b = needPoint(await getPoint('Specify base point')); sel.clear();
+  while (true) { const r = await getPoint('Specify second point', { base: b, allowEmpty: true, preview: previewXf(ents, c => mTrans(c.x - b.x, c.y - b.y)) }); if (r.empty) return; const p = needPoint(r); ents.forEach(e => doc.ents.push(xform(cloneEnt(e), mTrans(p.x - b.x, p.y - b.y)))); draw(); }
+}, 'Copy objects');
+def(['ROTATE', 'RO'], async () => {
+  const ents = await getSel(); const b = needPoint(await getPoint('Specify base point'));
+  const r = await getPoint('Specify rotation angle (degrees) or point', { base: b, acceptNum: true, preview: previewXf(ents, c => mRot(ang(b, c), b)) });
+  const t = r.num != null ? r.num * D2R : ang(b, r.pt); ents.forEach(e => xform(e, mRot(t, b))); sel.clear();
+}, 'Rotate objects');
+def(['SCALE', 'SC'], async () => {
+  const ents = await getSel(); const b = needPoint(await getPoint('Specify base point'));
+  const r = await getPoint('Specify scale factor', { base: b, acceptNum: true, preview: previewXf(ents, c => mScale(Math.max(dist(b, c), 1e-9), b)) });
+  const f = r.num != null ? r.num : dist(b, r.pt); if (!(f > 0)) throw new Error('Scale factor must be positive.'); ents.forEach(e => xform(e, mScale(f, b))); sel.clear();
+}, 'Scale objects');
+def(['MIRROR', 'MI'], async () => {
+  const ents = await getSel(); const a = needPoint(await getPoint('Specify first point of mirror line'));
+  const b = needPoint(await getPoint('Specify second point of mirror line', { base: a, preview: previewXf(ents, c => dist(a, c) > 1e-9 ? mMirror(a, c) : MI) }));
+  const k = await getPoint('Erase source objects?', { keywords: ['Yes', 'No'], allowEmpty: true, noBand: true });
+  const m = mMirror(a, b); if (k.kw === 'Yes') ents.forEach(e => xform(e, m)); else ents.forEach(e => doc.ents.push(xform(cloneEnt(e), m))); sel.clear();
+}, 'Mirror objects');
+def(['ERASE', 'E', 'DEL'], async () => { const ents = await getSel(); removeEnts(ents); log(`${ents.length} erased`); }, 'Erase objects');
+def(['EXPLODE', 'X'], async () => {
+  const ents = await getSel(); let n = 0;
+  for (const e of ents) { const parts = explodeEnt(e, doc); if (parts) { replaceEnt(e, parts); n++; } }
+  sel.clear(); log(n ? `${n} exploded` : 'Nothing explodable selected (polylines, blocks, dimensions, multiline text).');
+}, 'Break compound objects into parts');
+def(['OFFSET', 'O'], async () => {
+  const r = await getNum(`Specify offset distance <${st.offsetD}>`, { def: st.offsetD }); st.offsetD = r.num; const d = r.num;
+  sel.clear();
+  while (true) {
+    const pk = await getPick('Select object to offset', { allowEmpty: true }); if (pk.empty) return;
+    const e = pk.ent; const sp = needPoint(await getPoint('Specify point on side to offset', { preview: c => { const o = offsetEnt(e, d, c); return o ? [o] : []; } }));
+    const o = offsetEnt(e, d, sp); if (!o) log('That object type cannot be offset.', 'err'); else { doc.ents.push(o); draw(); }
+  }
+}, 'Offset lines, arcs, circles and polylines');
+function offsetEnt(e, d, side) {
+  const o = cloneEnt(e);
+  if (e.type === 'LINE') { const dir = sub(e.b, e.a), L = len(dir); const n = P(-dir.y / L, dir.x / L); const s = Math.sign(dot(sub(side, e.a), n)) || 1; o.a = add(e.a, mul(n, d * s)); o.b = add(e.b, mul(n, d * s)); return o; }
+  if (e.type === 'CIRCLE' || e.type === 'ARC') { const out = dist(side, e.c) > e.r; o.r = e.r + (out ? d : -d); return o.r > 1e-9 ? o : null; }
+  if (e.type === 'PLINE') {
+    const v = e.v, n = v.length, segs = [];
+    let bestD = Infinity, sgn = 1;
+    const prs = plPrims(v, e.closed);
+    prs.forEach(pr => { const dd = dPrim(side, pr); if (dd < bestD) { bestD = dd; if (pr.t === 'S') { const dir = sub(pr.b, pr.a); sgn = Math.sign(cross(dir, sub(side, pr.a))) || 1; } else { const inside = dist(side, pr.c) < pr.r; sgn = 0; segs.side = inside; segs.arc = pr; } } });
+    // determine offset sign relative to left normal of travel
+    if (sgn === 0) { // nearest is an arc: left side of a ccw arc is the inside
+      const ccwArc = prs.indexOf(segs.arc) >= 0 && v[prs.indexOf(segs.arc)].b > 0; sgn = (segs.side === ccwArc) ? 1 : -1;
+    }
+    const off = prs.map((pr, i) => {
+      if (pr.t === 'S') { const dir = sub(pr.b, pr.a), L = len(dir) || 1, nn = P(-dir.y / L * d * sgn, dir.x / L * d * sgn); return { t: 'S', a: add(pr.a, nn), b: add(pr.b, nn) }; }
+      const ccw = v[i].b > 0, r = pr.r + (ccw ? -d * sgn : d * sgn); if (r <= 1e-9) return null; return { t: 'A', c: pr.c, r, sa: pr.sa, ea: pr.ea, ccw };
+    });
+    if (off.some(x => !x)) return null;
+    const startOf = q => q.t === 'S' ? q.a : polar(q.c, q.r, q.ccw ? q.sa : q.ea), endOf = q => q.t === 'S' ? q.b : polar(q.c, q.r, q.ccw ? q.ea : q.sa);
+    const nv = [];
+    for (let i = 0; i < n; i++) {
+      const prev = e.closed ? off[(i - 1 + off.length) % off.length] : (i > 0 ? off[i - 1] : null), cur = i < off.length ? off[i] : null;
+      let p;
+      if (prev && cur && prev.t === 'S' && cur.t === 'S') { const x = ixSS(prev.a, prev.b, cur.a, cur.b, true); p = x.length ? x[0] : cur.a; }
+      else if (cur) p = startOf(cur); else p = endOf(prev);
+      nv.push({ x: p.x, y: p.y, b: v[i].b || 0 });
+    }
+    o.v = nv; return o;
+  }
+  return null;
+}
+def(['TRIM', 'TR'], async () => {
+  sel.clear(); log('All visible objects act as cutting edges.', 'dim');
+  while (true) {
+    const pk = await getPick('Select object to trim', { allowEmpty: true }); if (pk.empty) return;
+    if (!trimEnt(pk.ent, pk.pt)) log('Nothing to trim there. Lines, arcs and circles can be trimmed; explode polylines first.', 'err');
+    draw();
+  }
+}, 'Trim objects at intersections');
+function cutters(e) { return doc.ents.filter(o => o !== e && layerVisible(o.layer) && o.type !== 'TEXT' && o.type !== 'MTEXT'); }
+function trimEnt(e, p) {
+  if (e.type === 'LINE') {
+    const ts = [0, 1], d = sub(e.b, e.a), L2 = dot(d, d);
+    for (const o of cutters(e)) for (const x of ixEnts(e, o, doc)) { const t = dot(sub(x, e.a), d) / L2; if (t > 1e-7 && t < 1 - 1e-7) ts.push(t); }
+    if (ts.length < 3) return false; ts.sort((a, b) => a - b);
+    const tp = dot(sub(p, e.a), d) / L2; let i = 0; while (i < ts.length - 2 && tp > ts[i + 1]) i++;
+    const t0 = ts[i], t1 = ts[i + 1], parts = [];
+    if (t0 > 0) { const c = cloneEnt(e); c.b = add(e.a, mul(d, t0)); parts.push(c); }
+    if (t1 < 1) { const c = cloneEnt(e); c.a = add(e.a, mul(d, t1)); parts.push(c); }
+    replaceEnt(e, parts); return true;
+  }
+  if (e.type === 'CIRCLE' || e.type === 'ARC') {
+    const full = e.type === 'CIRCLE', sa = full ? 0 : e.sa, sw = full ? TAU : (normA(e.ea - e.sa) || TAU);
+    const as = [];
+    for (const o of cutters(e)) for (const x of ixEnts(e, o, doc)) { const t = normA(ang(e.c, x) - sa); if (full || (t > 1e-7 && t < sw - 1e-7)) as.push(t); }
+    if (full && as.length < 2) return false; if (!full && !as.length) return false;
+    const pts = full ? as.sort((a, b) => a - b) : [0, ...as.sort((a, b) => a - b), sw];
+    const tp = normA(ang(e.c, p) - sa);
+    if (full) {
+      let i = pts.findIndex(t => t > tp); if (i < 0) i = 0; const hi = pts[i], lo = pts[(i - 1 + pts.length) % pts.length];
+      replaceEnt(e, [Object.assign(mk('ARC', { c: e.c, r: e.r, sa: sa + hi, ea: sa + lo }, e.layer, e.color), e.lt ? { lt: e.lt } : {})]); return true;
+    }
+    let i = 0; while (i < pts.length - 2 && tp > pts[i + 1]) i++;
+    const parts = []; if (pts[i] > 0) { const c = cloneEnt(e); c.ea = sa + pts[i]; parts.push(c); } if (pts[i + 1] < sw) { const c = cloneEnt(e); c.sa = sa + pts[i + 1]; parts.push(c); }
+    replaceEnt(e, parts); return true;
+  }
+  return false;
+}
+def(['EXTEND', 'EX'], async () => {
+  sel.clear(); log('All visible objects act as boundaries.', 'dim');
+  while (true) {
+    const pk = await getPick('Select line to extend (pick near the end)', { allowEmpty: true, filter: e => e.type === 'LINE' }); if (pk.empty) return;
+    const e = pk.ent; const nearB = dist(pk.pt, e.b) < dist(pk.pt, e.a); const from = nearB ? e.a : e.b, to = nearB ? e.b : e.a, d = sub(to, from), L = len(d);
+    let best = null;
+    for (const o of cutters(e)) for (const pr of entPrims(o, doc)) {
+      let xs = [];
+      if (pr.t === 'S') { const r = sub(pr.b, pr.a), den = cross(d, r); if (Math.abs(den) < 1e-12) continue; const t = cross(sub(pr.a, from), r) / den, u = cross(sub(pr.a, from), d) / den; if (u >= -1e-9 && u <= 1 + 1e-9) xs.push(t); }
+      else if (pr.t === 'A') xs = ixLC(from, to, pr.c, pr.r, false).filter(x => inSweep(ang(pr.c, x), pr.sa, pr.ea)).map(x => dot(sub(x, from), d) / (L * L));
+      for (const t of xs) if (t > 1 + 1e-7 && (!best || t < best)) best = t;
+    }
+    if (!best) { log('No boundary in that direction.', 'err'); continue; }
+    const np = add(from, mul(d, best)); if (nearB) e.b = np; else e.a = np; invalidate(e); draw();
+  }
+}, 'Extend lines to the nearest boundary');
+def(['FILLET', 'F'], async () => {
+  sel.clear();
+  while (true) {
+    const r1 = await getPick(`Select first line (radius ${fmtNum(st.filletR, 4)})`, { keywords: ['Radius'], filter: e => e.type === 'LINE' });
+    if (r1.kw) { st.filletR = (await getNum('Specify fillet radius', { def: st.filletR })).num; continue; }
+    const r2 = await getPick('Select second line', { filter: e => e.type === 'LINE' && e !== r1.ent });
+    const A = r1.ent, B = r2.ent; const X = ixSS(A.a, A.b, B.a, B.b, true)[0]; if (!X) throw new Error('Lines are parallel.');
+    const side = (E, pk) => { const d = sub(E.b, E.a), u = mul(d, 1 / len(d)); const s = Math.sign(dot(sub(pk, X), u)) || 1; return mul(u, s); };
+    const u1 = side(A, r1.pt), u2 = side(B, r2.pt); const R = st.filletR;
+    const far = (E, u) => dot(sub(E.a, X), u) > dot(sub(E.b, X), u) ? 'a' : 'b';
+    const fa = far(A, u1), fb = far(B, u2), na = fa === 'a' ? 'b' : 'a', nb = fb === 'a' ? 'b' : 'a';
+    if (R <= 0) { A[na] = X; B[nb] = X; invalidate(A); invalidate(B); return; }
+    const th = Math.acos(Math.max(-1, Math.min(1, dot(u1, u2)))) / 2; if (th < 1e-6) throw new Error('Lines are parallel.');
+    const t = R / Math.tan(th), T1 = add(X, mul(u1, t)), T2 = add(X, mul(u2, t)); const bis = add(u1, u2), bl = len(bis); const c = add(X, mul(bis, R / Math.sin(th) / bl));
+    if (dot(sub(A[fa], X), u1) < t || dot(sub(B[fb], X), u2) < t) throw new Error('Radius is too large for these lines.');
+    A[na] = T1; B[nb] = T2; invalidate(A); invalidate(B);
+    let sa = ang(c, T1), ea = ang(c, T2); if (normA(ea - sa) > Math.PI) [sa, ea] = [ea, sa];
+    doc.ents.push(Object.assign(mk('ARC', { c, r: R, sa, ea }, A.layer, A.color), A.lt ? { lt: A.lt } : {}));
+    return;
+  }
+}, 'Round or square the corner between two lines');
+def(['ARRAY', 'AR'], async () => {
+  const ents = await getSel(); const k = await getPoint('Array type', { keywords: ['Rectangular', 'Polar'], allowEmpty: true, noBand: true }); sel.clear();
+  if (k.kw === 'Polar') {
+    const c = needPoint(await getPoint('Specify center point of array')); const n = Math.round((await getNum('Number of items', { def: 6 })).num); const fill = (await getNum('Angle to fill <360>', { def: 360 })).num * D2R;
+    const step = Math.abs(fill - TAU) < 1e-9 ? TAU / n : fill / (n - 1);
+    for (let i = 1; i < n; i++) ents.forEach(e => doc.ents.push(xform(cloneEnt(e), mRot(step * i, c)))); return;
+  }
+  const rows = Math.round((await getNum('Number of rows', { def: 3 })).num), cols = Math.round((await getNum('Number of columns', { def: 4 })).num);
+  const bb = docBB(doc, ents); const dy = rows > 1 ? (await getNum('Row spacing', { def: +((bb[3] - bb[1]) * 1.5).toFixed(3) })).num : 0, dx = cols > 1 ? (await getNum('Column spacing', { def: +((bb[2] - bb[0]) * 1.5).toFixed(3) })).num : 0;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (r || c) ents.forEach(e => doc.ents.push(xform(cloneEnt(e), mTrans(c * dx, r * dy))));
+}, 'Rectangular or polar array');
+def(['BLOCK', 'B'], async () => {
+  const name = ((await getText('Enter block name')).text || '').trim(); if (!name) return false;
+  if (doc.blocks.has(name)) throw new Error(`Block "${name}" already exists.`);
+  const base = needPoint(await getPoint('Specify insertion base point')); const ents = await getSel('Select objects for the block');
+  removeEnts(ents); doc.blocks.set(name, { name, base, ents: ents.map(e => { const c = cloneEnt(e); return c; }) });
+  addEnt(newE('INSERT', { name, p: base, sx: 1, sy: 1, rot: 0 })); log(`Block "${name}" created from ${ents.length} objects.`);
+}, 'Make a block from objects');
+def(['INSERT', 'I'], async () => {
+  const names = [...doc.blocks.keys()].filter(n => !n.startsWith('*')); if (!names.length) throw new Error('This drawing has no blocks yet. Use BLOCK to make one.');
+  log('Blocks: ' + names.join(', '), 'dim');
+  const name = ((await getText(`Enter block name <${names[0]}>`, { def: names[0] })).text || '').trim(); if (!doc.blocks.has(name)) throw new Error(`No block named "${name}".`);
+  const p = needPoint(await getPoint('Specify insertion point', { preview: c => [mk('INSERT', { name, p: c, sx: 1, sy: 1, rot: 0 }, doc.clayer)] }));
+  const s = (await getNum('Scale factor <1>', { def: 1 })).num, rot = (await getNum('Rotation angle <0>', { def: 0 })).num * D2R;
+  addEnt(newE('INSERT', { name, p, sx: s, sy: s, rot }));
+}, 'Insert a block');
+async function dimCmd(mode) {
+  const a = needPoint(await getPoint('Specify first extension line origin')); const b = needPoint(await getPoint('Specify second extension line origin', { base: a }));
+  const auto = c => { if (mode === 'A') return 'A'; const inX = c.x > Math.min(a.x, b.x) && c.x < Math.max(a.x, b.x), inY = c.y > Math.min(a.y, b.y) && c.y < Math.max(a.y, b.y); return !inX && inY ? 'V' : 'H'; };
+  const mkD = c => mk('DIM', { p1: a, p2: b, dl: c, mode: auto(c), th: st.dimTxt, ah: st.dimTxt * 0.85, ext: st.dimTxt * 0.4 }, doc.clayer);
+  const c = needPoint(await getPoint('Specify dimension line location', { noBand: true, preview: q => [mkD(q)] }));
+  const e = mkD(c); e.color = st.color; addEnt(e); log(`Dimension text = ${dimText(e)}`);
+}
+def(['DIMLINEAR', 'DLI', 'DIM'], () => dimCmd('L'), 'Horizontal or vertical dimension');
+def(['DIMALIGNED', 'DAL'], () => dimCmd('A'), 'Aligned dimension');
+def(['DIMTXT', 'DIMSCALE'], async () => { st.dimTxt = (await getNum(`Dimension text height <${st.dimTxt}>`, { def: st.dimTxt })).num; return false; }, 'Set dimension size');
+def(['DIST', 'DI'], async () => {
+  const a = needPoint(await getPoint('Specify first point')); const b = needPoint(await getPoint('Specify second point', { base: a }));
+  const d = sub(b, a); log(`Distance = ${fmtNum(len(d), 4)},  Angle = ${fmtNum(normA(Math.atan2(d.y, d.x)) * R2D, 3)}°,  ΔX = ${fmtNum(d.x, 4)},  ΔY = ${fmtNum(d.y, 4)}`, 'out'); return false;
+}, 'Measure distance');
+def(['AREA', 'AA'], async () => {
+  const r0 = await getPoint('Specify first corner point', { keywords: ['Object'] });
+  if (r0.kw) { const pk = await getPick('Select a closed object'); const l = closedLoopOf(pk.ent); if (!l) throw new Error('Select a closed polyline, circle or ellipse.'); const pts = plPoints(l, true); let per = 0; for (let i = 0; i < pts.length - 1; i++) per += dist(pts[i], pts[i + 1]); log(`Area = ${fmtNum(loopArea(l), 4)},  Perimeter = ${fmtNum(pk.ent.type === 'CIRCLE' ? TAU * pk.ent.r : per, 4)}`, 'out'); return false; }
+  const pts = [r0.pt];
+  while (true) { const r = await getPoint('Specify next point', { base: pts[pts.length - 1], allowEmpty: true, preview: c => [mk('PLINE', { v: [...pts, c].map(p => ({ ...p, b: 0 })), closed: true }, doc.clayer)] }); if (r.empty) break; pts.push(r.pt); }
+  const l = pts.map(p => ({ ...p, b: 0 })); let per = 0; for (let i = 0; i < pts.length; i++) per += dist(pts[i], pts[(i + 1) % pts.length]);
+  log(`Area = ${fmtNum(loopArea(l), 4)},  Perimeter = ${fmtNum(per, 4)}`, 'out'); return false;
+}, 'Measure area and perimeter');
+def(['LIST', 'LI'], async () => {
+  const ents = await getSel();
+  for (const e of ents.slice(0, 20)) {
+    let s = `${e.type} on layer "${e.layer}"`;
+    if (e.type === 'LINE') s += `  from ${fp(e.a)} to ${fp(e.b)}  length ${fmtNum(dist(e.a, e.b), 4)}`;
+    if (e.type === 'CIRCLE') s += `  center ${fp(e.c)}  radius ${fmtNum(e.r, 4)}`;
+    if (e.type === 'ARC') s += `  center ${fp(e.c)}  radius ${fmtNum(e.r, 4)}  ${fmtNum(normA(e.sa) * R2D, 2)}° → ${fmtNum(normA(e.ea) * R2D, 2)}°`;
+    if (e.type === 'PLINE') s += `  ${e.v.length} vertices${e.closed ? ', closed, area ' + fmtNum(loopArea(e.v), 4) : ''}`;
+    if (e.type === 'INSERT') s += `  block "${e.name}" at ${fp(e.p)}`;
+    if (e.type === 'TEXT' || e.type === 'MTEXT') s += `  "${textLines(e).join(' ')}"  height ${fmtNum(e.h, 3)}`;
+    log(s, 'out');
+  }
+  if (ents.length > 20) log(`…and ${ents.length - 20} more`, 'dim'); return false;
+}, 'List object data');
+const fp = p => `${fmtNum(p.x, 4)},${fmtNum(p.y, 4)}`;
+def(['MATCHPROP', 'MA'], async () => {
+  const src = (await getPick('Select source object')).ent; sel.clear();
+  while (true) { const r = await getPick('Select destination object', { allowEmpty: true }); if (r.empty) return; const e = r.ent; e.layer = src.layer; e.color = src.color; if (src.lt) e.lt = src.lt; else delete e.lt; draw(); }
+}, 'Copy layer, color and linetype between objects');
+def(['ZOOM', 'Z'], async () => {
+  const r = await getPoint('Specify corner of window', { keywords: ['Extents', 'Window'], allowEmpty: true, noBand: true });
+  if (r.empty || r.kw === 'Extents') { zoomExtents(); return false; }
+  const a = r.pt || needPoint(await getPoint('Specify first corner'));
+  const b = needPoint(await getPoint('Specify opposite corner', { base: a, noBand: true, preview: c => [mk('PLINE', { v: [a, P(c.x, a.y), c, P(a.x, c.y)].map(p => ({ ...p, b: 0 })), closed: true }, doc.clayer)] }));
+  zoomBB([Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x, b.x), Math.max(a.y, b.y)], 0.02); draw(); return false;
+}, 'Zoom to extents or a window');
+def(['ZE'], async () => { zoomExtents(); return false; }, 'Zoom extents');
+def(['PAN', 'P'], async () => { setPan(!panMode); return false; }, 'Toggle pan mode');
+def(['LAYER', 'LA'], async () => { showTab('layers'); return false; }, 'Open the layer panel');
+def(['UNDO', 'U'], async () => { undo(); return false; }, 'Undo');
+def(['REDO'], async () => { redo(); return false; }, 'Redo');
+def(['SNAPUNIT', 'SN'], async () => { st.snapUnit = (await getNum(`Snap spacing <${st.snapUnit}>`, { def: st.snapUnit })).num; st.snap = true; syncToggles(); return false; }, 'Set grid snap spacing');
+def(['UNITS', 'UN'], async () => {
+  const r = await getPoint('Drawing units', { keywords: ['mm', 'cm', 'm', 'in', 'ft'], noBand: true }); const map = { mm: 4, cm: 5, m: 6, in: 1, ft: 2 }; doc.units = map[r.kw] || 4; updateStatus(); log(`Units set to ${r.kw}. Geometry is not rescaled.`, 'dim');
+}, 'Set drawing units');
+def(['OPEN'], async () => { $('#file').click(); return false; }, 'Open a DWG or DXF file');
+def(['SAVE', 'SAVEAS'], async () => { saveDXF(); return false; }, 'Save as DXF');
+def(['PLOT', 'PRINT'], async () => { openPlot(); return false; }, 'Plot to PDF at scale');
+def(['NEW'], async () => { newDrawing(); return false; }, 'Start a blank drawing');
+def(['HELP', '?'], async () => {
+  const seen = new Set(); for (const k in CMDS) { if (seen.has(k)) continue; seen.add(k); const al = Object.keys(ALIASES).filter(a => ALIASES[a] === k && a !== k); log(`${k.padEnd(11)} ${al.join(', ').padEnd(14)} ${CMDS[k].desc || ''}`, 'out'); }
+  log('Points: click, or type x,y · @dx,dy · @dist<angle · a distance along the cursor direction.', 'dim'); return false;
+}, 'List commands');
+['ZOOM', 'ZE', 'PAN', 'LAYER', 'UNDO', 'REDO', 'SNAPUNIT', 'DIMTXT', 'DIST', 'AREA', 'LIST', 'OPEN', 'SAVE', 'PLOT', 'NEW', 'HELP'].forEach(k => CMDS[k].mod = false);
+
+// grip edit
+async function gripEdit(e, g) {
+  running = 'GRIP';
+  const before = ser();
+  try {
+    const r = await getPoint('Specify stretch point', { base: g.p, preview: c => { const t = cloneEnt(e); applyGrip(t, g, c); return [t]; } });
+    applyGrip(e, g, needPoint(r));
+    undoStack.push(before); redoStack = []; markDirty();
+  } catch (err) { if (!(err instanceof Cancel)) log('Error: ' + err.message, 'err'); }
+  running = null; setPrompt('Command'); updateProps(); draw();
+}
+
+// ---------- mouse ----------
+cv.addEventListener('contextmenu', ev => ev.preventDefault());
+let downInfo = null;
+const pointers = new Map(); let pinch = null;
+cv.addEventListener('pointerdown', ev => {
+  cv.setPointerCapture(ev.pointerId); pointers.set(ev.pointerId, { x: ev.offsetX, y: ev.offsetY });
+  if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinch = { d: dist(a, b), c: mul(add(a, b), .5) }; downInfo = null; boxSel = null; return; }
+  mouse.sx = ev.offsetX; mouse.sy = ev.offsetY; mouse.in = true; mouse.w = s2w(ev.offsetX, ev.offsetY); snapHit = computeSnap(ev.offsetX, ev.offsetY);
+  if (ev.button === 1 || (ev.button === 0 && (panMode || ev.altKey || spaceDown))) { panDrag = { x: ev.offsetX, y: ev.offsetY, tx: view.tx, ty: view.ty }; cv.style.cursor = 'grabbing'; return; }
+  if (ev.button === 2) { downInfo = { right: true }; return; }
+  if (ev.button !== 0) return;
+  downInfo = { x: ev.offsetX, y: ev.offsetY, shift: ev.shiftKey, t: Date.now() };
+});
+cv.addEventListener('pointermove', ev => {
+  if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x: ev.offsetX, y: ev.offsetY });
+  if (pinch && pointers.size === 2) { const [a, b] = [...pointers.values()]; const d = dist(a, b), c = mul(add(a, b), .5); view.tx += c.x - pinch.c.x; view.ty += c.y - pinch.c.y; zoomAt(c.x, c.y, d / pinch.d); pinch = { d, c }; return; }
+  mouse.sx = ev.offsetX; mouse.sy = ev.offsetY; mouse.in = true; mouse.w = s2w(ev.offsetX, ev.offsetY);
+  if (panDrag) { view.tx = panDrag.tx + ev.offsetX - panDrag.x; view.ty = panDrag.ty + ev.offsetY - panDrag.y; draw(); return; }
+  if (downInfo && !downInfo.right && (!req || req.type === 'sel') && (Math.abs(ev.offsetX - downInfo.x) > 4 || Math.abs(ev.offsetY - downInfo.y) > 4)) boxSel = { x0: downInfo.x, y0: downInfo.y, x1: ev.offsetX, y1: ev.offsetY };
+  snapHit = computeSnap(ev.offsetX, ev.offsetY);
+  if (!req || req.type === 'sel' || req.type === 'pick') { const h = boxSel ? null : entAt(ev.offsetX, ev.offsetY, req && req.filter ? req.filter : selectable); hover = h; } else hover = null;
+  updateStatus(); draw();
+});
+cv.addEventListener('pointerleave', () => { mouse.in = false; hover = null; snapHit = null; draw(); });
+cv.addEventListener('pointerup', ev => {
+  pointers.delete(ev.pointerId); if (pinch) { if (pointers.size < 2) pinch = null; return; }
+  if (panDrag) { panDrag = null; cv.style.cursor = ''; return; }
+  const di = downInfo; downInfo = null; if (!di) return;
+  if (di.right) { if (req) submitInput(''); else if (sel.size) { sel.clear(); updateProps(); draw(); } else if (lastCmd) runCommand(lastCmd); return; }
+  if (boxSel) { const b = boxSel; boxSel = null; boxSelect(b, di.shift); return; }
+  const sx = ev.offsetX, sy = ev.offsetY;
+  if (req && req.type === 'point') { const p = curPoint(); lastPt = p; log(`${promptEl.textContent} ${fp(p)}`, 'echo'); resolveReq({ pt: p }); return; }
+  if (req && req.type === 'pick') { const e = entAt(sx, sy, req.filter || selectable); if (e) resolveReq({ ent: e, pt: s2w(sx, sy) }); return; }
+  if (!req && !running && sel.size) { for (const e of doc.ents) if (sel.has(e.id)) for (const g of grips(e)) { const s = w2s(g.p); if (Math.abs(s.x - sx) < 6 && Math.abs(s.y - sy) < 6) { gripEdit(e, g); return; } } }
+  const e = entAt(sx, sy, selectable);
+  if (e) { if (di.shift && sel.has(e.id)) sel.delete(e.id); else sel.add(e.id); }
+  else if (!req && !di.shift) sel.clear();
+  updateProps(); draw();
+});
+function boxSelect(b, remove) {
+  const p0 = s2w(b.x0, b.y0), p1 = s2w(b.x1, b.y1), cross = b.x1 < b.x0;
+  const bb = [Math.min(p0.x, p1.x), Math.min(p0.y, p1.y), Math.max(p0.x, p1.x), Math.max(p0.y, p1.y)];
+  const edges = [[P(bb[0], bb[1]), P(bb[2], bb[1])], [P(bb[2], bb[1]), P(bb[2], bb[3])], [P(bb[2], bb[3]), P(bb[0], bb[3])], [P(bb[0], bb[3]), P(bb[0], bb[1])]];
+  for (const e of doc.ents) {
+    if (!selectable(e) || e.type === 'XLINE') continue; const eb = entBB(e, doc);
+    const inside = eb[0] >= bb[0] && eb[2] <= bb[2] && eb[1] >= bb[1] && eb[3] <= bb[3];
+    let hit = inside;
+    if (!hit && cross && !(eb[2] < bb[0] || eb[0] > bb[2] || eb[3] < bb[1] || eb[1] > bb[3])) {
+      const prs = entPrims(e, doc); hit = prs.some(pr => (pr.t === 'P' && pr.p.x >= bb[0] && pr.p.x <= bb[2] && pr.p.y >= bb[1] && pr.p.y <= bb[3]) || (pr.t === 'S' && (pr.a.x >= bb[0] && pr.a.x <= bb[2] && pr.a.y >= bb[1] && pr.a.y <= bb[3])) || edges.some(([a, c]) => ixPrim({ t: 'S', a, b: c }, pr).length));
+      if (!hit && e.type === 'HATCH') hit = pointInLoops(P((bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2), e.loops);
+    }
+    if (hit) remove ? sel.delete(e.id) : sel.add(e.id);
+  }
+  updateProps(); draw();
+}
+cv.addEventListener('wheel', ev => { ev.preventDefault(); const f = Math.exp(-ev.deltaY * (ev.deltaMode === 1 ? 0.05 : 0.0015)); zoomAt(ev.offsetX, ev.offsetY, f); }, { passive: false });
+cv.addEventListener('dblclick', ev => { if (req) return; const e = entAt(ev.offsetX, ev.offsetY, selectable); if (e && (e.type === 'TEXT' || e.type === 'MTEXT' || e.type === 'DIM')) { sel.clear(); sel.add(e.id); updateProps(); const f = $('#pp-text'); if (f) { showTab('props'); f.focus(); f.select(); } } else if (!e) zoomExtents(); });
+
+let spaceDown = false;
+window.addEventListener('keydown', ev => {
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  const inField = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') && document.activeElement !== inEl;
+  if (ev.key === 'F3') { ev.preventDefault(); toggle('osnap'); return; }
+  if (ev.key === 'F7') { ev.preventDefault(); toggle('grid'); return; }
+  if (ev.key === 'F8') { ev.preventDefault(); toggle('ortho'); return; }
+  if (ev.key === 'F9') { ev.preventDefault(); toggle('snap'); return; }
+  if (inField) return;
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); if (!running) ev.shiftKey ? redo() : undo(); return; }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'y') { ev.preventDefault(); if (!running) redo(); return; }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') { ev.preventDefault(); saveDXF(); return; }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'o') { ev.preventDefault(); $('#file').click(); return; }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'a') { if (document.activeElement === inEl && inEl.value) return; ev.preventDefault(); doc.ents.filter(selectable).forEach(e => sel.add(e.id)); updateProps(); draw(); return; }
+  if (document.activeElement === inEl) return;
+  if (ev.key === 'Escape') { cancel(); return; }
+  if ((ev.key === 'Delete' || ev.key === 'Backspace') && sel.size && !running) { ev.preventDefault(); runCommand('ERASE'); return; }
+  if (ev.key === ' ' && !inEl.value) { ev.preventDefault(); if (!spaceDown && !req && !running && !lastCmd) { } spaceDown = true; if (req || !running) submitInput(''); return; }
+  if (ev.key === 'Enter') { ev.preventDefault(); submitInput(''); return; }
+  if (ev.key.length === 1 && !ev.ctrlKey && !ev.metaKey && !ev.altKey) { inEl.focus(); }
+});
+window.addEventListener('keyup', ev => { if (ev.key === ' ') spaceDown = false; });
+
+// ---------- toggles & status ----------
+function toggle(k) { st[k] = !st[k]; syncToggles(); log(`${k.toUpperCase()} ${st[k] ? 'on' : 'off'}`, 'dim'); draw(); }
+function syncToggles() { document.querySelectorAll('[data-toggle]').forEach(b => b.setAttribute('aria-pressed', st[b.dataset.toggle] ? 'true' : 'false')); }
+document.querySelectorAll('[data-toggle]').forEach(b => b.addEventListener('click', () => toggle(b.dataset.toggle)));
+const UNIT_NAMES = { 0: 'unitless', 1: 'in', 2: 'ft', 4: 'mm', 5: 'cm', 6: 'm' };
+function updateStatus() { const p = snapHit ? snapHit.p : mouse.w; $('#coords').textContent = `${fmtFixed(p.x)}, ${fmtFixed(p.y)}`; $('#units').textContent = UNIT_NAMES[doc.units] || 'units'; }
+const fmtFixed = v => (Math.abs(v) >= 1e5 ? v.toExponential(3) : v.toFixed(4));
+function setPan(on) { panMode = on; $('#btn-pan').setAttribute('aria-pressed', on ? 'true' : 'false'); cv.style.cursor = on ? 'grab' : ''; }
+
+// ---------- tools ribbon ----------
+document.querySelectorAll('[data-cmd]').forEach(b => b.addEventListener('click', () => { if (b.dataset.cmd === 'PAN') return setPan(!panMode); runCommand(b.dataset.cmd); }));
+function highlightTool(name) { document.querySelectorAll('[data-cmd]').forEach(b => b.classList.toggle('active', b.dataset.cmd === name)); }
+
+// ---------- side panel ----------
+function showTab(t) { document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t ? 'true' : 'false')); $('#pane-layers').hidden = t !== 'layers'; $('#pane-props').hidden = t !== 'props'; document.body.classList.add('panel-open'); }
+document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+$('#btn-panel').addEventListener('click', () => document.body.classList.toggle('panel-open'));
+function swatch(c, rgb) { return `<span class="sw" style="background:${c === 7 && rgb == null ? 'var(--ink-canvas)' : cssACI(c, rgb)}"></span>`; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function refreshLayers() {
+  const counts = {}; doc.ents.forEach(e => counts[e.layer] = (counts[e.layer] || 0) + 1);
+  const rows = [...doc.layers.values()].sort((a, b) => a.name === '0' ? -1 : b.name === '0' ? 1 : a.name.localeCompare(b.name, undefined, { numeric: true }));
+  $('#layers').innerHTML = rows.map(L => `<li class="${L.name === doc.clayer ? 'cur' : ''}" data-layer="${esc(L.name)}">
+    <button class="lcur" title="Make current" aria-label="Make ${esc(L.name)} current">${L.name === doc.clayer ? '●' : '○'}</button>
+    <button class="lon" aria-pressed="${L.on}" title="${L.on ? 'Hide' : 'Show'} layer">${L.on ? 'On' : 'Off'}</button>
+    <button class="llock" aria-pressed="${L.locked}" title="${L.locked ? 'Unlock' : 'Lock'} layer">${L.locked ? 'Lock' : '—'}</button>
+    <label class="lcol" title="Color (ACI 1–255)">${swatch(L.color, L.rgb)}<input type="number" min="1" max="255" value="${L.color}" aria-label="Color for ${esc(L.name)}"></label>
+    <input class="lname" value="${esc(L.name)}" ${L.name === '0' ? 'readonly' : ''} aria-label="Layer name">
+    <span class="lcount">${counts[L.name] || 0}</span></li>`).join('');
+  const cl = $('#clayer'); cl.innerHTML = rows.map(L => `<option ${L.name === doc.clayer ? 'selected' : ''}>${esc(L.name)}</option>`).join('');
+}
+$('#layers').addEventListener('click', ev => {
+  const li = ev.target.closest('li'); if (!li) return; const L = doc.layers.get(li.dataset.layer); if (!L) return;
+  if (ev.target.closest('.lcur')) { doc.clayer = L.name; }
+  else if (ev.target.closest('.lon')) { pushUndo(); L.on = !L.on; if (!L.on) doc.ents.forEach(e => e.layer === L.name && sel.delete(e.id)); }
+  else if (ev.target.closest('.llock')) { pushUndo(); L.locked = !L.locked; if (L.locked) doc.ents.forEach(e => e.layer === L.name && sel.delete(e.id)); }
+  else return;
+  refreshLayers(); updateProps(); draw();
+});
+$('#layers').addEventListener('change', ev => {
+  const li = ev.target.closest('li'); if (!li) return; const L = doc.layers.get(li.dataset.layer); if (!L) return;
+  if (ev.target.type === 'number') { const v = Math.round(+ev.target.value); if (v >= 1 && v <= 255) { pushUndo(); L.color = v; delete L.rgb; } }
+  if (ev.target.classList.contains('lname')) {
+    const nn = ev.target.value.trim(); if (!nn || nn === L.name) return refreshLayers(); if (doc.layers.has(nn)) { log(`Layer "${nn}" already exists.`, 'err'); return refreshLayers(); }
+    pushUndo(); const old = L.name; doc.layers.delete(old); L.name = nn; doc.layers.set(nn, L);
+    const ren = e => { if (e.layer === old) e.layer = nn; }; doc.ents.forEach(ren); doc.blocks.forEach(b => b.ents.forEach(ren)); if (doc.clayer === old) doc.clayer = nn;
+  }
+  refreshLayers(); updateProps(); draw();
+});
+$('#layer-new').addEventListener('click', () => { let i = 1; while (doc.layers.has('Layer' + i)) i++; pushUndo(); doc.layers.set('Layer' + i, { name: 'Layer' + i, color: 7, on: true, locked: false, lt: 'CONTINUOUS' }); refreshLayers(); const inp = document.querySelector(`[data-layer="Layer${i}"] .lname`); if (inp) { inp.focus(); inp.select(); } });
+$('#layer-del').addEventListener('click', () => {
+  const used = new Set(doc.ents.map(e => e.layer)); doc.blocks.forEach(b => b.ents.forEach(e => used.add(e.layer)));
+  const unused = [...doc.layers.keys()].filter(n => n !== '0' && n !== doc.clayer && !used.has(n));
+  if (!unused.length) return log('Every layer is in use (or current). Only empty layers can be purged.', 'dim');
+  pushUndo(); unused.forEach(n => doc.layers.delete(n)); log(`Purged ${unused.length} empty layer${unused.length > 1 ? 's' : ''}: ${unused.join(', ')}`, 'dim'); refreshLayers();
+});
+$('#clayer').addEventListener('change', ev => { doc.clayer = ev.target.value; refreshLayers(); });
+$('#ccolor').addEventListener('change', ev => { st.color = +ev.target.value; });
+$('#clt').addEventListener('change', ev => { st.lt = ev.target.value || null; });
+
+const LTS = ['CONTINUOUS', 'DASHED', 'HIDDEN', 'CENTER', 'PHANTOM', 'DOT'];
+function colorOptions(cur) { const opts = [[256, 'ByLayer'], [0, 'ByBlock'], [1, 'Red'], [2, 'Yellow'], [3, 'Green'], [4, 'Cyan'], [5, 'Blue'], [6, 'Magenta'], [7, 'White / Black'], [8, 'Gray'], [9, 'Light gray']]; if (cur != null && !opts.some(o => o[0] === cur)) opts.push([cur, 'ACI ' + cur]); return opts.map(([v, n]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${n}</option>`).join(''); }
+$('#ccolor').innerHTML = colorOptions(256);
+$('#clt').innerHTML = `<option value="">ByLayer</option>` + LTS.map(l => `<option>${l}</option>`).join('');
+function field(id, label, val, opts = {}) { return `<label class="fld"><span>${label}</span><input id="${id}" ${opts.ro ? 'readonly' : ''} type="${opts.type || 'text'}" inputmode="${opts.text ? 'text' : 'decimal'}" value="${esc(val)}"></label>`; }
+const n4 = v => fmtNum(v, 4);
+function updateProps() {
+  const box = $('#pp');
+  const ents = doc.ents.filter(e => sel.has(e.id));
+  $('#selcount').textContent = ents.length ? `${ents.length} selected` : '';
+  if (!ents.length) {
+    const types = {}; doc.ents.forEach(e => types[e.type] = (types[e.type] || 0) + 1);
+    box.innerHTML = `<p class="hint">Nothing selected. Click objects, or drag a window: left-to-right selects objects fully inside, right-to-left also catches anything it crosses.</p>
+      <dl class="facts"><dt>Drawing</dt><dd>${esc(doc.name)}</dd><dt>Objects</dt><dd>${doc.ents.length}</dd><dt>Layers</dt><dd>${doc.layers.size}</dd><dt>Blocks</dt><dd>${[...doc.blocks.keys()].filter(n => !n.startsWith('*')).length}</dd><dt>Units</dt><dd>${UNIT_NAMES[doc.units] || 'units'}</dd></dl>
+      <p class="hint">${Object.entries(types).sort((a, b) => b[1] - a[1]).map(([t, n]) => `${n} ${t.toLowerCase()}`).join(' · ')}</p>`;
+    return;
+  }
+  const same = k => ents.every(e => (e[k] ?? null) === (ents[0][k] ?? null)) ? ents[0][k] : undefined;
+  const types = [...new Set(ents.map(e => e.type))];
+  let h = `<div class="pp-type">${types.length === 1 ? (ents.length > 1 ? ents.length + ' × ' : '') + types[0] : ents.length + ' objects (' + types.join(', ').toLowerCase() + ')'}</div>`;
+  const lay = same('layer');
+  h += `<label class="fld"><span>Layer</span><select id="pp-layer">${lay === undefined ? '<option value="">*varies*</option>' : ''}${[...doc.layers.keys()].map(n => `<option ${n === lay ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>`;
+  const col = same('color');
+  h += `<label class="fld"><span>Color</span><select id="pp-color">${col === undefined ? '<option value="">*varies*</option>' : ''}${colorOptions(col)}</select></label>`;
+  const lt = same('lt');
+  h += `<label class="fld"><span>Linetype</span><select id="pp-lt">${lt === undefined ? '<option value="*">*varies*</option>' : ''}<option value="" ${lt == null ? 'selected' : ''}>ByLayer</option>${LTS.map(l => `<option ${l === lt ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+  if (ents.length === 1) {
+    const e = ents[0]; h += '<div class="pp-geo">';
+    if (e.type === 'LINE') h += field('pp-ax', 'Start X', n4(e.a.x)) + field('pp-ay', 'Start Y', n4(e.a.y)) + field('pp-bx', 'End X', n4(e.b.x)) + field('pp-by', 'End Y', n4(e.b.y)) + field('pp-len', 'Length', n4(dist(e.a, e.b))) + field('pp-ang', 'Angle °', n4(normA(ang(e.a, e.b)) * R2D), { ro: true });
+    if (e.type === 'CIRCLE') h += field('pp-cx', 'Center X', n4(e.c.x)) + field('pp-cy', 'Center Y', n4(e.c.y)) + field('pp-r', 'Radius', n4(e.r)) + field('pp-d', 'Diameter', n4(e.r * 2)) + field('pp-area', 'Area', n4(Math.PI * e.r * e.r), { ro: true });
+    if (e.type === 'ARC') h += field('pp-cx', 'Center X', n4(e.c.x)) + field('pp-cy', 'Center Y', n4(e.c.y)) + field('pp-r', 'Radius', n4(e.r)) + field('pp-sa', 'Start °', n4(normA(e.sa) * R2D)) + field('pp-ea', 'End °', n4(normA(e.ea) * R2D)) + field('pp-al', 'Arc length', n4(e.r * (normA(e.ea - e.sa) || TAU)), { ro: true });
+    if (e.type === 'TEXT' || e.type === 'MTEXT') h += `<label class="fld wide"><span>Contents</span><textarea id="pp-text" rows="3">${esc(e.text)}</textarea></label>` + field('pp-h', 'Height', n4(e.h)) + field('pp-rot', 'Rotation °', n4((e.rot || 0) * R2D)) + field('pp-px', 'X', n4(textAnchor(e).x)) + field('pp-py', 'Y', n4(textAnchor(e).y));
+    if (e.type === 'INSERT') h += field('pp-name', 'Block', e.name, { ro: true, text: true }) + field('pp-px', 'X', n4(e.p.x)) + field('pp-py', 'Y', n4(e.p.y)) + field('pp-sx', 'Scale X', n4(e.sx)) + field('pp-sy', 'Scale Y', n4(e.sy)) + field('pp-rot', 'Rotation °', n4((e.rot || 0) * R2D));
+    if (e.type === 'PLINE') { const per = plPrims(e.v, e.closed).reduce((s, q) => s + (q.t === 'S' ? dist(q.a, q.b) : q.r * (normA(q.ea - q.sa) || TAU)), 0); h += field('pp-nv', 'Vertices', e.v.length, { ro: true }) + `<label class="fld chk"><span>Closed</span><input id="pp-closed" type="checkbox" ${e.closed ? 'checked' : ''}></label>` + field('pp-per', 'Length', n4(per), { ro: true }) + (e.closed ? field('pp-area', 'Area', n4(loopArea(e.v)), { ro: true }) : ''); }
+    if (e.type === 'DIM') h += `<label class="fld wide"><span>Text override</span><input id="pp-text" value="${esc(e.text || '')}" placeholder="${esc(dimText({ ...e, text: '' }))}"></label>` + field('pp-th', 'Text height', n4(e.th || 2.5)) + field('pp-prec', 'Decimals', e.prec == null ? 2 : e.prec);
+    if (e.type === 'POINT') h += field('pp-px', 'X', n4(e.p.x)) + field('pp-py', 'Y', n4(e.p.y));
+    if (e.type === 'HATCH') h += field('pp-pat', 'Pattern', e.pattern, { ro: true, text: true }) + field('pp-area', 'Area', n4(e.loops.reduce((s, l, i) => s + (i ? -1 : 1) * loopArea(l), 0)), { ro: true });
+    h += '</div>';
+  }
+  box.innerHTML = h;
+}
+$('#pp').addEventListener('change', ev => {
+  const ents = doc.ents.filter(e => sel.has(e.id)); if (!ents.length) return; const id = ev.target.id, v = ev.target.value;
+  pushUndo();
+  if (id === 'pp-layer' && v) ents.forEach(e => { e.layer = v; invalidate(e); });
+  else if (id === 'pp-color' && v !== '') ents.forEach(e => { e.color = +v; delete e.rgb; });
+  else if (id === 'pp-lt' && v !== '*') ents.forEach(e => { if (v) e.lt = v; else delete e.lt; });
+  else if (ents.length === 1) {
+    const e = ents[0], f = parseFloat(v), ok = !isNaN(f);
+    const set = (fn) => { if (ok || id === 'pp-text' || id === 'pp-closed') fn(); };
+    switch (id) {
+      case 'pp-ax': set(() => e.a = P(f, e.a.y)); break; case 'pp-ay': set(() => e.a = P(e.a.x, f)); break;
+      case 'pp-bx': set(() => e.b = P(f, e.b.y)); break; case 'pp-by': set(() => e.b = P(e.b.x, f)); break;
+      case 'pp-len': set(() => { if (f > 0) e.b = polar(e.a, f, ang(e.a, e.b)); }); break;
+      case 'pp-cx': set(() => e.c = P(f, e.c.y)); break; case 'pp-cy': set(() => e.c = P(e.c.x, f)); break;
+      case 'pp-r': set(() => { if (f > 0) e.r = f; }); break; case 'pp-d': set(() => { if (f > 0) e.r = f / 2; }); break;
+      case 'pp-sa': set(() => e.sa = f * D2R); break; case 'pp-ea': set(() => e.ea = f * D2R); break;
+      case 'pp-text': e.text = v; break; case 'pp-h': set(() => { if (f > 0) e.h = f; }); break; case 'pp-rot': set(() => e.rot = f * D2R); break;
+      case 'pp-px': set(() => xform(e, mTrans(f - (e.type === 'TEXT' || e.type === 'MTEXT' ? textAnchor(e).x : e.p.x), 0))); break;
+      case 'pp-py': set(() => xform(e, mTrans(0, f - (e.type === 'TEXT' || e.type === 'MTEXT' ? textAnchor(e).y : e.p.y)))); break;
+      case 'pp-sx': set(() => e.sx = f); break; case 'pp-sy': set(() => e.sy = f); break;
+      case 'pp-closed': e.closed = ev.target.checked; break;
+      case 'pp-th': set(() => { if (f > 0) { e.th = f; e.ah = f * 0.85; e.ext = f * 0.4; } }); break;
+      case 'pp-prec': set(() => e.prec = Math.max(0, Math.min(8, Math.round(f)))); break;
+    }
+    invalidate(e);
+  }
+  updateProps(); refreshLayers(); draw();
+});
+
+// ---------- file IO ----------
+function updateTitle() { $('#docname').textContent = doc.name + (dirty ? ' •' : ''); $('#example-flag').hidden = !docIsExample; }
+function loadDoc(d, name) {
+  doc = d; doc.name = name || doc.name; sel.clear(); undoStack = []; redoStack = []; dirty = false; docIsExample = false;
+  refreshLayers(); updateProps(); updateTitle(); zoomExtents(); updateStatus();
+  log(`Opened ${doc.name}: ${doc.ents.length} objects, ${doc.layers.size} layers, ${[...doc.blocks.keys()].filter(n => !n.startsWith('*')).length} blocks.`, 'out');
+  if (d.warnings && d.warnings.length) log(`Not shown (unsupported object types): ${d.warnings.join(', ')}`, 'dim');
+}
+function newDrawing() { if (dirty && !confirmBar('Discard unsaved changes and start a new drawing?', newDrawing)) return; const d = newDoc(); d.name = 'Untitled.dxf'; loadDoc(d, 'Untitled.dxf'); view.s = 4; view.tx = view.w / 2; view.ty = view.h / 2; draw(); }
+let confirmPending = null;
+function confirmBar(msg, fn) { if (confirmPending === fn) { confirmPending = null; dirty = false; return true; } confirmPending = fn; toast(msg + ' Click again to confirm.'); setTimeout(() => { if (confirmPending === fn) confirmPending = null; }, 5000); return false; }
+$('#file').addEventListener('change', ev => { const f = ev.target.files[0]; if (f) openFile(f); ev.target.value = ''; });
+const stage = $('#stage');
+stage.addEventListener('dragover', ev => { ev.preventDefault(); stage.classList.add('drop'); });
+stage.addEventListener('dragleave', () => stage.classList.remove('drop'));
+stage.addEventListener('drop', ev => { ev.preventDefault(); stage.classList.remove('drop'); const f = ev.dataTransfer.files[0]; if (f) openFile(f); });
+async function openFile(f) {
+  const ext = f.name.split('.').pop().toLowerCase();
+  busy(`Reading ${f.name}…`);
+  try {
+    if (ext === 'dxf') {
+      const buf = await f.arrayBuffer(); let text = new TextDecoder('utf-8').decode(buf);
+      if (/^AutoCAD Binary DXF/.test(text.slice(0, 22))) throw new Error('Binary DXF is not supported. Save it as ASCII DXF.');
+      if (text.includes('\uFFFD')) text = new TextDecoder('windows-1252').decode(buf);
+      loadDoc(parseDXF(text), f.name);
+    } else if (ext === 'dwg') {
+      const lib = await loadDwgLib();
+      const buf = await f.arrayBuffer();
+      const raw = lib.L.dwg_read_data(buf, lib.m.Dwg_File_Type.DWG);
+      if (!raw) throw new Error('This DWG could not be read.');
+      const db = lib.L.convert(raw); try { lib.L.dwg_free(raw); } catch (e) { }
+      const d = dwgToDoc(db); loadDoc(d, f.name);
+      log('DWG opened read-only from the original; saving writes a DXF copy.', 'dim');
+    } else throw new Error('Open a .dwg or .dxf file.');
+  } catch (err) { console.error(err); log(`Could not open ${f.name}: ${err.message || err}`, 'err'); toast(`Could not open ${f.name}.`); }
+  busy(null);
+}
+let dwgLibP = null;
+function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src)); document.head.appendChild(s); }); }
+function loadDwgLib() {
+  if (dwgLibP) return dwgLibP;
+  dwgLibP = (async () => {
+    busy('Loading the DWG reader (first time only, about 7 MB)…');
+    await loadScript('libredwg.js');
+    const m = window['libredwg-web']; if (!m) throw new Error('DWG reader failed to start.');
+    const wasm = await (await fetch('libredwg.wasm')).arrayBuffer();
+    const inst = await m.createModule({ wasmBinary: wasm, print: () => { }, printErr: () => { } });
+    return { m, L: m.LibreDwg.createByWasmInstance(inst) };
+  })();
+  dwgLibP.catch(() => { dwgLibP = null; });
+  return dwgLibP;
+}
+let dlCap;
+async function offerFile(filename, data, label) {
+  if (dlCap === undefined) { try { dlCap = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { dlCap = null; } }
+  if (!dlCap) {
+    if (window.claude) return false;
+    const blob = data instanceof Blob ? data : new Blob([data]); const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast(`${label} saved.`); return true;
+  }
+  try { await dlCap.save({ filename, data }); toast(`${label} saved.`); return true; }
+  catch (err) { if (err && err.code === 'declined') { toast('Save cancelled.'); return true; } if (err && err.code === 'rate_limited') { toast('A save prompt is already open.'); return true; } console.warn(err); return false; }
+}
+const baseName = () => (doc.name || 'drawing').replace(/\.(dwg|dxf)$/i, '').replace(/[\\/:*?"<>|]+/g, '_') || 'drawing';
+async function saveDXF() {
+  const text = writeDXF(doc), name = baseName() + '.dxf';
+  if (!window.claude) { if (await offerFile(name, text, 'DXF')) { dirty = false; updateTitle(); } return; }
+  busy('Packing DXF…');
+  try {
+    if (!window.JSZip) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+    const zip = new JSZip(); zip.file(name, text); const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    busy(null);
+    if (await offerFile(baseName() + '.zip', blob, 'DXF')) { dirty = false; updateTitle(); return; }
+  } catch (err) { busy(null); console.warn(err); }
+  showTextOut('DXF file contents', name, text);
+}
+function showTextOut(title, name, text) {
+  $('#tx-title').textContent = title; $('#tx-name').textContent = `Save this text as ${name}`; $('#tx-area').value = text; $('#textout').hidden = false; $('#tx-area').focus(); $('#tx-area').select();
+}
+$('#tx-copy').addEventListener('click', async () => { const t = $('#tx-area'); try { await navigator.clipboard.writeText(t.value); toast('Copied.'); } catch (e) { t.focus(); t.select(); toast('Press Ctrl+C to copy.'); } });
+$('#tx-close').addEventListener('click', () => $('#textout').hidden = true);
+
+// ---------- export walker (SVG / PDF) ----------
+function walk(cb, onlyEnts) {
+  const visit = (e, m, inh, depth) => {
+    if (!layerVisible(e.layer) && !(depth && e.layer === '0')) return;
+    const col = entColor(e, inh), lt = entLt(e);
+    const poly = (pts, closed, fill) => cb({ k: 'poly', pts: pts.map(p => tp(m, p)), closed, fill, col, lt });
+    switch (e.type) {
+      case 'LINE': poly([e.a, e.b]); break;
+      case 'CIRCLE': poly(tessArc(e.c, e.r, 0, TAU, 96), true); break;
+      case 'ARC': poly(tessArc(e.c, e.r, e.sa, e.ea)); break;
+      case 'PLINE': poly(plPoints(e.v, e.closed), e.closed); break;
+      case 'ELLIPSE': poly(tessEllipse(e)); break;
+      case 'SPLINE': poly(tessSpline(e), e.closed); break;
+      case 'SOLID': poly(e.pts, true, e.fill); break;
+      case 'HATCH': for (const l of e.loops) poly(plPoints(l, true), true, e.solid ? 'evenodd' : false); break;
+      case 'POINT': poly([add(e.p, P(-.5, 0)), add(e.p, P(.5, 0))]); break;
+      case 'TEXT': case 'MTEXT': {
+        const box = textBox(e), a = textAnchor(e), sc = Math.sqrt(Math.abs(mDet(m))), r0 = Math.atan2(m.b, m.a);
+        textLines(e).forEach((l, i) => {
+          let off = e.type === 'TEXT' ? P(box[0], box[1]) : P(box[0], box[3] - e.h * (1 + i * 1.66));
+          const pW = tp(m, tp(mMul(mTrans(a.x, a.y), mRot(e.rot || 0)), off));
+          cb({ k: 'text', p: pW, h: e.h * sc, rot: (e.rot || 0) + r0, str: l, col });
+        }); break;
+      }
+      case 'DIM': { const parts = explodeEnt(e); parts.forEach(q => visit(Object.assign(q, { color: e.color }), m, inh, depth)); const g = dimGeom(e), ah = e.ah || 2.5; for (const [p, d] of [[g.a, g.dir], [g.b, mul(g.dir, -1)]]) { const n = P(-d.y, d.x), q = add(p, mul(d, ah)); poly([p, add(q, mul(n, ah / 6)), sub(q, mul(n, ah / 6))], true, true); } break; }
+      case 'INSERT': { const blk = doc.blocks.get(e.name); if (!blk || depth > 6) break; const mm = mMul(m, insertM(e, blk)); blk.ents.forEach(be => visit(be, mm, col, depth + 1)); break; }
+    }
+  };
+  for (const e of onlyEnts || doc.ents) if (e.type !== 'XLINE') visit(e, MI, null, 0);
+}
+$('#btn-svg').addEventListener('click', exportSVG);
+async function exportSVG() {
+  const bb = docBB(doc, doc.ents.filter(e => e.type !== 'XLINE')); if (!isFinite(bb[0])) return toast('The drawing is empty.');
+  const pad = Math.max(bb[2] - bb[0], bb[3] - bb[1]) * 0.03, W = bb[2] - bb[0] + 2 * pad, H = bb[3] - bb[1] + 2 * pad;
+  const sw = Math.max(W, H) / 1500; const out = []; const mono = c => c;
+  const X = p => (p.x - bb[0] + pad).toFixed(4), Y = p => (bb[3] + pad - p.y).toFixed(4);
+  walk(it => {
+    const c = it.col === TH['--ink'] ? '#000000' : it.col;
+    if (it.k === 'poly') out.push(`<path d="M${it.pts.map(p => X(p) + ' ' + Y(p)).join(' L')}${it.closed ? ' Z' : ''}" ${it.fill ? `fill="${c}" fill-rule="evenodd" stroke="none"` : `fill="none" stroke="${c}"`}${!it.fill && it.lt && DASH[it.lt] ? ` stroke-dasharray="${DASH[it.lt].map(x => x * sw * 1.5).join(' ')}"` : ''}/>`);
+    else out.push(`<text x="${X(it.p)}" y="${Y(it.p)}" font-size="${(it.h * 1).toFixed(4)}" fill="${c}" transform="rotate(${(-it.rot * R2D).toFixed(3)} ${X(it.p)} ${Y(it.p)})">${esc(it.str)}</text>`);
+  });
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W.toFixed(4)} ${H.toFixed(4)}" width="${W.toFixed(2)}${doc.units === 4 ? 'mm' : ''}" height="${H.toFixed(2)}${doc.units === 4 ? 'mm' : ''}">\n<g stroke-width="${sw.toFixed(5)}" stroke-linecap="round" stroke-linejoin="round" font-family="monospace">\n${out.join('\n')}\n</g></svg>`;
+  if (!(await offerFile(baseName() + '.svg', svg, 'SVG'))) showTextOut('SVG file contents', baseName() + '.svg', svg);
+}
+
+// ---------- plot to PDF ----------
+const SHEETS = { 'ISO A4': [297, 210], 'ISO A3': [420, 297], 'ISO A2': [594, 420], 'ISO A1': [841, 594], 'ISO A0': [1189, 841], 'ANSI A (Letter)': [279.4, 215.9], 'ANSI B (Tabloid)': [431.8, 279.4], 'ANSI C': [558.8, 431.8], 'ANSI D': [863.6, 558.8] };
+const UNIT_MM = { 0: 1, 1: 25.4, 2: 304.8, 4: 1, 5: 10, 6: 1000 };
+$('#pl-sheet').innerHTML = Object.keys(SHEETS).map(k => `<option>${k}</option>`).join('');
+function openPlot() { $('#plot').hidden = false; plotPreview(); }
+$('#btn-plot').addEventListener('click', openPlot);
+$('#pl-cancel').addEventListener('click', () => $('#plot').hidden = true);
+['pl-sheet', 'pl-orient', 'pl-scale', 'pl-area', 'pl-mono', 'pl-lw'].forEach(id => $('#' + id).addEventListener('input', plotPreview));
+function plotSetup() {
+  let [w, h] = SHEETS[$('#pl-sheet').value]; if ($('#pl-orient').value === 'portrait') [w, h] = [h, w];
+  const margin = 10, area = $('#pl-area').value;
+  let bb; if (area === 'display') { const a = s2w(0, view.h), b = s2w(view.w, 0); bb = [a.x, a.y, b.x, b.y]; } else bb = docBB(doc, doc.ents.filter(e => e.type !== 'XLINE'));
+  const umm = UNIT_MM[doc.units] || 1, bw = (bb[2] - bb[0]) * umm, bh = (bb[3] - bb[1]) * umm;
+  const sv = $('#pl-scale').value.trim(); let k;
+  if (/^fit$/i.test(sv) || !sv) k = Math.min((w - 2 * margin) / bw, (h - 2 * margin) / bh);
+  else { const m = sv.match(/^([\d.]+)\s*[:=]\s*([\d.]+)$/); k = m ? +m[1] / +m[2] : NaN; }
+  return { w, h, margin, bb, umm, k, ok: isFinite(k) && k > 0 && isFinite(bb[0]) };
+}
+function plotPreview() {
+  const s = plotSetup(), c = $('#pl-prev'), g = c.getContext('2d'); const dpr = window.devicePixelRatio || 1;
+  const cw = c.clientWidth, ch = c.clientHeight; c.width = cw * dpr; c.height = ch * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, cw, ch);
+  const f = Math.min((cw - 20) / s.w, (ch - 20) / s.h), ox = (cw - s.w * f) / 2, oy = (ch - s.h * f) / 2;
+  g.fillStyle = '#ffffff'; g.fillRect(ox, oy, s.w * f, s.h * f); g.strokeStyle = 'rgba(0,0,0,.25)'; g.strokeRect(ox + .5, oy + .5, s.w * f, s.h * f);
+  g.setLineDash([3, 3]); g.strokeRect(ox + s.margin * f, oy + s.margin * f, (s.w - 2 * s.margin) * f, (s.h - 2 * s.margin) * f); g.setLineDash([]);
+  if (!s.ok) { $('#pl-info').textContent = 'Enter a scale like 1:2, 2:1 or Fit.'; return; }
+  const mono = $('#pl-mono').checked; const cx = (s.bb[0] + s.bb[2]) / 2, cy = (s.bb[1] + s.bb[3]) / 2;
+  const T = p => P(ox + (s.w / 2 + (p.x - cx) * s.umm * s.k) * f, oy + (s.h / 2 - (p.y - cy) * s.umm * s.k) * f);
+  g.save(); g.beginPath(); g.rect(ox, oy, s.w * f, s.h * f); g.clip(); g.lineWidth = 0.6;
+  walk(it => { const col = mono || it.col === TH['--ink'] ? '#000' : it.col; g.strokeStyle = col; g.fillStyle = col; if (it.k === 'poly') { g.beginPath(); it.pts.forEach((p, i) => { const q = T(p); i ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y); }); if (it.closed) g.closePath(); it.fill ? g.fill('evenodd') : g.stroke(); } else { const q = T(it.p), hh = it.h * s.umm * s.k * f; if (hh > 1) { g.save(); g.translate(q.x, q.y); g.rotate(-it.rot); g.font = `${hh}px monospace`; g.fillText(it.str, 0, 0); g.restore(); } } });
+  g.restore();
+  const fits = (s.bb[2] - s.bb[0]) * s.umm * s.k <= s.w - 2 * s.margin + 1e-6 && (s.bb[3] - s.bb[1]) * s.umm * s.k <= s.h - 2 * s.margin + 1e-6;
+  $('#pl-info').textContent = `Scale ${s.k >= 1 ? fmtNum(s.k, 3) + ':1' : '1:' + fmtNum(1 / s.k, 3)} · ${fmtNum((s.bb[2] - s.bb[0]) * s.umm * s.k, 1)} × ${fmtNum((s.bb[3] - s.bb[1]) * s.umm * s.k, 1)} mm on a ${fmtNum(s.w, 1)} × ${fmtNum(s.h, 1)} mm sheet${fits ? '' : ' — does not fit inside the margins'}`;
+}
+$('#pl-go').addEventListener('click', async () => {
+  const s = plotSetup(); if (!s.ok) return;
+  busy('Plotting PDF…');
+  try {
+    if (!window.jspdf) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: [s.w, s.h], orientation: s.w > s.h ? 'landscape' : 'portrait' });
+    const mono = $('#pl-mono').checked, lw = +$('#pl-lw').value; const cx = (s.bb[0] + s.bb[2]) / 2, cy = (s.bb[1] + s.bb[3]) / 2;
+    const T = p => [s.w / 2 + (p.x - cx) * s.umm * s.k, s.h / 2 - (p.y - cy) * s.umm * s.k];
+    pdf.setLineWidth(lw); pdf.setLineCap('round'); pdf.setLineJoin('round'); pdf.setFont('courier', 'normal');
+    const rgb = c => { if (mono || c === TH['--ink']) return [0, 0, 0]; const m = /^#?([0-9a-f]{6})$/i.exec(c); if (!m) return [0, 0, 0]; const n = parseInt(m[1], 16); let r = n >> 16, g2 = (n >> 8) & 255, b = n & 255; if (r > 230 && g2 > 230 && b > 230) return [0, 0, 0]; return [r, g2, b]; };
+    walk(it => {
+      const [r, g2, b] = rgb(it.col); pdf.setDrawColor(r, g2, b); pdf.setFillColor(r, g2, b); pdf.setTextColor(r, g2, b);
+      if (it.k === 'poly') {
+        const pts = it.pts.map(T); if (pts.length < 2) return;
+        const segs = []; for (let i = 1; i < pts.length; i++) segs.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
+        const dash = !it.fill && it.lt && DASH[it.lt] ? DASH[it.lt].map(x => x * 0.35) : null; pdf.setLineDashPattern(dash || [], 0);
+        pdf.lines(segs, pts[0][0], pts[0][1], [1, 1], it.fill ? 'F' : 'S', !!it.closed);
+      } else { const q = T(it.p), hmm = it.h * s.umm * s.k; if (hmm < 0.3) return; pdf.setFontSize(hmm / 0.3528 / 0.72); pdf.text(it.str, q[0], q[1], { angle: it.rot * R2D }); }
+    });
+    const blob = pdf.output('blob'); busy(null); $('#plot').hidden = true;
+    if (!(await offerFile(baseName() + '.pdf', blob, 'PDF'))) toast('This view cannot save files. Open the page in claude.ai to plot.');
+  } catch (err) { busy(null); console.error(err); toast('Plot failed: ' + err.message); }
+});
+
+// ---------- misc UI ----------
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 4000); }
+function busy(msg) { const b = $('#busy'); if (msg) { b.textContent = msg; b.hidden = false; } else b.hidden = true; }
+$('#btn-open').addEventListener('click', () => $('#file').click());
+$('#btn-save').addEventListener('click', saveDXF);
+$('#btn-new').addEventListener('click', newDrawing);
+$('#btn-undo').addEventListener('click', () => !running && undo());
+$('#btn-redo').addEventListener('click', () => !running && redo());
+$('#btn-ze').addEventListener('click', zoomExtents);
+$('#btn-pan').addEventListener('click', () => setPan(!panMode));
+window.addEventListener('beforeunload', ev => { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
+new ResizeObserver(resize).observe($('#stage'));
+setPrompt('Command'); syncToggles(); refreshLayers(); updateProps(); updateTitle();
+resize(); zoomExtents();
+log('DraftBench ready. Type a command (L, C, PL, TR, …) or HELP. Open a DWG or DXF with Open or drag it onto the canvas.', 'dim');
+
+</script>
+</body></html>
